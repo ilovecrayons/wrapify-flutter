@@ -14,6 +14,8 @@ dependencies:
   just_audio: ^0.9.35
   audio_service: ^0.18.10
   path_provider: ^2.1.1
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
   # If you want background audio, uncomment this:
   # just_audio_background: ^0.0.1-beta.10
 
