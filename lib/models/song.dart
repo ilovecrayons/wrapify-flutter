@@ -32,14 +32,17 @@ class Song {
 
   // Create from a map (for loading from storage)
   factory Song.fromJson(Map<String, dynamic> json) {
+    // Handle case where error info might be stored differently
+    final hasError = json['has_error'] == true || json['error_message'] != null;
+    
     return Song(
       id: json['id'],
-      title: json['name'],
-      artist: json['artists'],
-      imageUrl: json['image'],
+      title: json['name'] ?? json['title'] ?? 'Unknown Song',
+      artist: json['artists'] ?? json['artist'] ?? 'Unknown Artist',
+      imageUrl: json['image'] ?? json['imageUrl'],
       externalUrls: json['external_urls'],
-      errorMessage: json['error_message'],
-      hasError: json['has_error'] ?? false,
+      errorMessage: json['error_message'] ?? json['errorMessage'],
+      hasError: hasError,
     );
   }
   

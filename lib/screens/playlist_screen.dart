@@ -31,6 +31,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   double _bufferingProgress = 0.0;
   PlaybackMode _playbackMode = PlaybackMode.linear;
   SyncJob? _syncJob;
+  
+  final Map<String, String> _songErrorMessages = {};
   int _errorCount = 0;
 
   @override
@@ -38,6 +40,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     super.initState();
     _loadPlaylist();
     _setupListeners();
+    
+    print('PlaylistScreen initialized for playlist ID: ${widget.playlistId}');
   }
 
   void _setupListeners() {
@@ -80,7 +84,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     });
 
     try {
-      // Get playlist metadata from storage
       final playlists = await _storageService.loadPlaylists();
       final playlist = playlists.firstWhere(
           (p) => p.id == widget.playlistId,
@@ -90,31 +93,24 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 spotifyUrl: '',
               ));
 
-      // Check if there's a sync job for this playlist
       if (playlist.syncJobId != null) {
         _syncJob = await _storageService.getLatestSyncJobForPlaylist(widget.playlistId);
         
-        // If we have a sync job that's still processing, start polling for updates
         if (_syncJob != null && (_syncJob!.isProcessing || _syncJob!.isQueued)) {
           _startSyncStatusPolling(_syncJob!.id);
         }
       }
 
-      // Try to fetch songs from the API
       final songs = await _apiService.fetchPlaylistSongs(widget.playlistId);
 
-      // Pre-cache the first song for faster playback
       if (songs.isNotEmpty) {
         _audioPlayerService.preCacheSong(songs.first);
       }
 
-      // Save newly fetched songs to storage
       await _storageService.addSongs(songs);
 
-      // Check for song errors
       await _checkForSongErrors();
 
-      // Update playlist with song IDs if needed
       if (playlist.songIds.isEmpty && songs.isNotEmpty) {
         final updatedPlaylist = Playlist(
           id: playlist.id,
@@ -141,7 +137,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     } catch (e) {
       print('Error loading playlist: $e');
 
-      // Try to load songs from cache if API fails
       final cachedSongs = await _storageService.loadSongs();
       final playlists = await _storageService.loadPlaylists();
       final playlist = playlists.firstWhere(
@@ -152,7 +147,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 spotifyUrl: '',
               ));
 
-      // Filter songs that belong to this playlist
       final playlistSongs = <Song>[];
       for (final songId in playlist.songIds) {
         if (cachedSongs.containsKey(songId)) {
@@ -166,7 +160,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         _isLoading = false;
       });
 
-      // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -178,52 +171,209 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     }
   }
 
-  // Check for song errors when opening the playlist
   Future<void> _checkForSongErrors() async {
     try {
       final errorsData = await _apiService.getPlaylistErrors(widget.playlistId);
-      
+
+      print('【ERROR DEBUG】Raw error data from API: $errorsData');
+
+      _songErrorMessages.clear();
+
       if (errorsData['errorCount'] > 0 && errorsData['songs'] is List && errorsData['songs'].isNotEmpty) {
-        // Save the error information
-        await _storageService.saveSongErrors(
-          widget.playlistId, 
-          List<Map<String, dynamic>>.from(errorsData['songs'])
-        );
-        
-        // Update the songs list with error info
-        final errorSongs = errorsData['songs'] as List;
-        final errorSongIds = errorSongs.map((s) => s['id'].toString()).toSet();
-        
-        // Count errors
+        final List<dynamic> errorSongs = errorsData['songs'] as List;
+        final errorSongsList = List<Map<String, dynamic>>.from(errorSongs);
+
+        for (final errorSong in errorSongsList) {
+          final songId = errorSong['id'].toString();
+          final errorMessage = errorSong['errorMessage'] ?? 'Unknown error';
+          _songErrorMessages[songId] = errorMessage;
+        }
+
+        print('【ERROR DEBUG】Found ${errorSongsList.length} songs with errors: $_songErrorMessages');
+
+        await _storageService.saveSongErrors(widget.playlistId, errorSongsList);
+
         setState(() {
-          _errorCount = errorsData['errorCount'] ?? 0;
+          _errorCount = _songErrorMessages.length;
         });
-        
-        // Reload songs to get error information
-        final cachedSongs = await _storageService.loadSongs();
-        
-        // Update the song list with error information
+      } else {
+        print('【ERROR DEBUG】No errors found in the playlist.');
         setState(() {
-          _songs = _songs.map((song) {
-            if (errorSongIds.contains(song.id)) {
-              return song.copyWithError(
-                errorSongs.firstWhere((s) => s['id'] == song.id)['errorMessage'] ?? 'Unknown error'
-              );
-            }
-            return song;
-          }).toList();
+          _errorCount = 0;
         });
       }
     } catch (e) {
       print('Error checking for song errors: $e');
     }
   }
-  
-  // Poll for sync status updates
+
+  bool _songHasError(String songId) {
+    return _songErrorMessages.containsKey(songId);
+  }
+
+  String? _getErrorMessage(String songId) {
+    return _songErrorMessages[songId];
+  }
+
+  void _showErrorSongsDialog() {
+    print('Opening error dialog with direct access to error songs');
+    
+    _refreshErrorInformation().then((_) {
+      final displayErrorSongs = _songs.where((song) => _songHasError(song.id)).map((song) {
+        return Song(
+          id: song.id,
+          title: song.title,
+          artist: song.artist,
+          imageUrl: song.imageUrl,
+          externalUrls: song.externalUrls,
+          errorMessage: _getErrorMessage(song.id),
+          hasError: true,
+        );
+      }).toList();
+
+      print('【ERROR DEBUG】Error songs found for dialog: ${displayErrorSongs.length}');
+      for (var song in displayErrorSongs) {
+        print('【ERROR DEBUG】Error song in dialog: ${song.title} - ${song.id} - ${song.errorMessage}');
+      }
+
+      if (displayErrorSongs.isEmpty) {
+        print('No error songs found, displaying a message');
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('No Error Songs'),
+            content: const Text('No songs with errors were found in this playlist.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Song Errors (${displayErrorSongs.length})'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: displayErrorSongs.length,
+              itemBuilder: (context, index) {
+                final song = displayErrorSongs[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.error, color: Colors.red, size: 20),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              song.title,
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Padding(
+                        padding: EdgeInsets.only(left: 28.0, top: 4.0),
+                        child: Text(
+                          song.errorMessage ?? 'Unknown error',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Future<void> _refreshErrorInformation() async {
+    try {
+      final errorsData = await _apiService.getPlaylistErrors(widget.playlistId);
+      
+      _songErrorMessages.clear();
+
+      if (errorsData['errorCount'] > 0 && errorsData['songs'] is List && errorsData['songs'].isNotEmpty) {
+        final List<dynamic> errorSongs = errorsData['songs'] as List;
+        
+        for (final errorSong in errorSongs) {
+          final songId = errorSong['id'].toString();
+          final errorMessage = errorSong['errorMessage'] ?? 'Unknown error';
+          _songErrorMessages[songId] = errorMessage;
+        }
+        
+        print('【ERROR DEBUG】Refreshed error info: ${_songErrorMessages.length} errors');
+        
+        setState(() {
+          _errorCount = _songErrorMessages.length;
+        });
+      } else {
+        setState(() {
+          _errorCount = 0;
+        });
+      }
+    } catch (e) {
+      print('Error refreshing error information: $e');
+    }
+  }
+
+  void _showErrorDetails(Song song) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Error Details for "${song.title}"'),
+        content: Text(_getErrorMessage(song.id) ?? 'Unknown error'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _playSong(Song song) async {
+    if (_songHasError(song.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cannot play song: ${_getErrorMessage(song.id) ?? "Unknown error"}'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
+    _audioPlayerService.setPlaylist(_songs.where((s) => !_songHasError(s.id)).toList(), 
+      startIndex: _songs.indexWhere((s) => s.id == song.id),
+      autoPlay: false);
+      
+    await _audioPlayerService.playSong(song);
+  }
+
   void _startSyncStatusPolling(String jobId) async {
     bool isComplete = false;
     int attempts = 0;
-    const maxAttempts = 30; // Poll for a maximum of 5 minutes (10 seconds * 30)
+    const maxAttempts = 30;
     
     while (!isComplete && attempts < maxAttempts && mounted) {
       try {
@@ -240,16 +390,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           });
         }
         
-        // If the job is complete or has an error, stop polling
         if (syncJob.isComplete || syncJob.isError) {
           isComplete = true;
           
-          // Update the playlist with the final information
           if (syncJob.isComplete && mounted) {
-            // Reload the playlist to get the updated data
             await _loadPlaylist();
-            
-            // Check for any song errors
             await _checkForSongErrors();
           } else if (syncJob.isError && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -266,14 +411,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         print('Error polling sync status: $e');
         attempts++;
         
-        // If too many errors, just stop polling
         if (attempts > 5) {
           isComplete = true;
         }
       }
     }
     
-    // Reset syncing state if we're done
     if (mounted) {
       setState(() {
         _isSyncing = false;
@@ -304,17 +447,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         ),
       );
 
-      // Request sync from API - now returns job information
       final syncJob = await _apiService.syncPlaylist(_playlist!.spotifyUrl);
       
-      // Save the sync job
       await _storageService.saveSyncJob(syncJob);
       
-      // Update the playlist to include the sync job ID
       if (_playlist != null) {
         final updatedPlaylist = Playlist(
           id: _playlist!.id,
-          name: syncJob.playlistName, // Use name from API
+          name: syncJob.playlistName,
           spotifyUrl: _playlist!.spotifyUrl,
           imageUrl: _playlist!.imageUrl,
           songIds: _playlist!.songIds,
@@ -329,7 +469,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         });
       }
       
-      // Start polling for status updates
       _startSyncStatusPolling(syncJob.id);
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -354,31 +493,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     }
   }
 
-  void _playSong(Song song) async {
-    // Don't try to play songs with errors
-    if (song.hasError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Cannot play song: ${song.errorMessage ?? "Unknown error"}'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-    
-    // Set the playlist if it hasn't been set yet
-    _audioPlayerService.setPlaylist(_songs.where((s) => !s.hasError).toList(), 
-      startIndex: _songs.indexWhere((s) => s.id == song.id),
-      autoPlay: false);
-      
-    // Now play the selected song
-    await _audioPlayerService.playSong(song);
-  }
-
   @override
   void dispose() {
-    // We don't dispose the audio player service here since
-    // it should continue playing even when leaving this screen
     super.dispose();
   }
 
@@ -390,7 +506,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
-          // Show sync status if actively syncing
           if (_isSyncing && _syncJob != null)
             Center(
               child: Padding(
@@ -404,7 +519,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               ),
             ),
           
-          // Add Sync button
           IconButton(
             icon: _isSyncing 
                 ? const SizedBox(
@@ -417,7 +531,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
             onPressed: _isSyncing ? null : _syncPlaylist,
           ),
           
-          // Show error count button if there are errors
           if (_errorCount > 0)
             IconButton(
               icon: Badge(
@@ -425,38 +538,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 child: const Icon(Icons.error_outline),
               ),
               tooltip: 'Show song errors',
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Song Errors'),
-                    content: SizedBox(
-                      width: double.maxFinite,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _songs.where((s) => s.hasError).length,
-                        itemBuilder: (context, index) {
-                          final errorSong = _songs.where((s) => s.hasError).toList()[index];
-                          return ListTile(
-                            title: Text(errorSong.title),
-                            subtitle: Text(errorSong.errorMessage ?? 'Unknown error'),
-                            leading: const Icon(Icons.error, color: Colors.red),
-                          );
-                        },
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Close'),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              onPressed: _showErrorSongsDialog,
             ),
           
-          // Add shuffle button
           IconButton(
             icon: Icon(
               _playbackMode == PlaybackMode.shuffle 
@@ -508,7 +592,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       ),
       body: Column(
         children: [
-          // Sync status indicator
           if (_syncJob != null && (_syncJob!.isProcessing || _syncJob!.isQueued))
             LinearProgressIndicator(
               value: _syncJob!.progress > 0 ? _syncJob!.progress : null,
@@ -516,7 +599,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
             ),
             
-          // Now playing bar
           if (_currentSong != null)
             NowPlayingBar(
               song: _currentSong!,
@@ -525,7 +607,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               onTap: () => _audioPlayerService.togglePlayback(),
             ),
 
-          // Playback controls
           if (_currentSong != null)
             PlaybackControls(
               audioPlayerService: _audioPlayerService,
@@ -533,7 +614,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               playbackMode: _playbackMode,
             ),
 
-          // Song list
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -564,32 +644,65 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         itemCount: _songs.length,
                         itemBuilder: (context, index) {
                           final song = _songs[index];
+                          final hasError = _songHasError(song.id);
                           return ListTile(
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: song.imageUrl != null
-                                  ? Image.network(song.imageUrl!,
-                                      fit: BoxFit.cover)
-                                  : const Icon(Icons.music_note),
+                            leading: Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: song.imageUrl != null
+                                      ? Image.network(song.imageUrl!,
+                                          fit: BoxFit.cover)
+                                      : const Icon(Icons.music_note),
+                                ),
+                                if (hasError)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    width: 16,
+                                    height: 16,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.error,
+                                        size: 12,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             title: Text(
                               song.title,
                               style: TextStyle(
-                                color: song.hasError ? Colors.grey : null,
-                                decoration: song.hasError ? TextDecoration.lineThrough : null,
+                                color: hasError ? Colors.grey : null,
+                                decoration: hasError ? TextDecoration.lineThrough : null,
                               ),
                             ),
-                            subtitle: Text(song.artist),
-                            onTap: () => _playSong(song),
-                            trailing: song.hasError
-                                ? Tooltip(
-                                    message: song.errorMessage ?? 'Unknown error',
-                                    child: const Icon(Icons.error_outline, color: Colors.red),
+                            subtitle: hasError 
+                                ? Text(
+                                    'Error: ${_getErrorMessage(song.id)}',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                    ),
+                                  )
+                                : Text(song.artist),
+                            onTap: () => hasError 
+                                ? _showErrorDetails(song)
+                                : _playSong(song),
+                            trailing: hasError
+                                ? IconButton(
+                                    icon: const Icon(Icons.error, color: Colors.red),
+                                    tooltip: _getErrorMessage(song.id) ?? 'Unknown error',
+                                    onPressed: () => _showErrorDetails(song),
                                   )
                                 : _currentSong?.id == song.id && _isPlaying
                                     ? const Icon(Icons.volume_up, color: Colors.green)
