@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
+import 'screens/playlist_screen.dart';
 import 'widgets/global_playback_bar.dart';
 // TODO: option to redownload songs on demand 
 void main() async {
@@ -47,9 +48,46 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AppWithPlaybackBar extends StatelessWidget {
+class AppWithPlaybackBar extends StatefulWidget {
   const AppWithPlaybackBar({super.key});
 
+  @override
+  State<AppWithPlaybackBar> createState() => _AppWithPlaybackBarState();
+}
+
+class _AppWithPlaybackBarState extends State<AppWithPlaybackBar> {
+  late Widget _currentScreen;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with the HomeScreen and provide the navigation callback
+    _currentScreen = HomeScreen(
+      title: 'Wrapify',
+      onPlaylistSelected: (playlistId) => navigateToPlaylist(playlistId),
+    );
+  }
+  
+  // Method to navigate to the playlist screen
+  void navigateToPlaylist(String playlistId) {
+    setState(() {
+      _currentScreen = PlaylistScreen(
+        playlistId: playlistId,
+        onBack: () => navigateToHome(),
+      );
+    });
+  }
+  
+  // Method to navigate back to home
+  void navigateToHome() {
+    setState(() {
+      _currentScreen = HomeScreen(
+        title: 'Wrapify',
+        onPlaylistSelected: (playlistId) => navigateToPlaylist(playlistId),
+      );
+    });
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,7 +95,7 @@ class AppWithPlaybackBar extends StatelessWidget {
         children: [
           // Main content area (takes up all available space)
           Expanded(
-            child: HomeScreen(title: 'Wrapify'),
+            child: _currentScreen,
           ),
           // Global playback bar (only takes the space it needs)
           const GlobalPlaybackBar(),

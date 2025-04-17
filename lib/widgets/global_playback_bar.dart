@@ -15,6 +15,8 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
   bool _isPlaying = false;
   double _bufferingProgress = 0.0;
   PlaybackMode _playbackMode = PlaybackMode.linear;
+  Duration _currentPosition = Duration.zero;
+  Duration _totalDuration = Duration.zero;
 
   @override
   void initState() {
@@ -54,6 +56,31 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
         });
       }
     });
+
+    // Listen for position updates
+    _audioPlayerService.audioPlayer.positionStream.listen((position) {
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+        });
+      }
+    });
+
+    // Listen for duration updates
+    _audioPlayerService.audioPlayer.durationStream.listen((duration) {
+      if (mounted && duration != null) {
+        setState(() {
+          _totalDuration = duration;
+        });
+      }
+    });
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String minutes = twoDigits(duration.inMinutes.remainder(60));
+    String seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$minutes:$seconds";
   }
 
   @override
@@ -63,67 +90,120 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
       return const SizedBox.shrink();
     }
 
+    final double progressValue = _totalDuration.inMilliseconds > 0 
+        ? _currentPosition.inMilliseconds / _totalDuration.inMilliseconds 
+        : 0.0;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Now playing bar
+        // Now playing bar with progress
         GestureDetector(
           onTap: _audioPlayerService.togglePlayback,
           child: Container(
             padding: const EdgeInsets.all(12),
             color: Colors.grey[200],
-            child: Row(
+            child: Column(
               children: [
-                // Song image or placeholder
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[400],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: _currentSong!.imageUrl != null
-                      ? Image.network(_currentSong!.imageUrl!, fit: BoxFit.cover)
-                      : const Icon(Icons.music_note, size: 24),
+                Row(
+                  children: [
+                    // Song image or placeholder
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: _currentSong!.imageUrl != null
+                          ? Image.network(_currentSong!.imageUrl!, fit: BoxFit.cover)
+                          : const Icon(Icons.music_note, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    // Song info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _currentSong!.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            maxLines: 1,
+                          ),
+                          Text(
+                            _currentSong!.artist,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            maxLines: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Play/pause button
+                    IconButton(
+                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                      iconSize: 32,
+                      onPressed: _audioPlayerService.togglePlayback,
+                    ),
+                    // Playback mode toggle moved here
+                    IconButton(
+                      icon: Icon(
+                        _playbackMode == PlaybackMode.shuffle ? Icons.shuffle : Icons.repeat,
+                        color: _playbackMode == PlaybackMode.shuffle ? Colors.green : Colors.grey,
+                      ),
+                      onPressed: _audioPlayerService.togglePlaybackMode,
+                      tooltip: _playbackMode == PlaybackMode.shuffle 
+                          ? 'Shuffle mode (tap to change)' 
+                          : 'Linear mode (tap to change)',
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                // Song info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _currentSong!.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        maxLines: 1,
+                const SizedBox(height: 8),
+                // Progress indicator row
+                Row(
+                  children: [
+                    Text(
+                      _formatDuration(_currentPosition),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          // Playback progress
+                          LinearProgressIndicator(
+                            value: progressValue,
+                            backgroundColor: Colors.grey[300],
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Theme.of(context).colorScheme.primary,
+                            ),
+                            minHeight: 3,
+                          ),
+                          const SizedBox(height: 2),
+                          // Buffer indicator
+                          LinearProgressIndicator(
+                            value: _bufferingProgress,
+                            backgroundColor: Colors.transparent,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.grey[400]!,
+                            ),
+                            minHeight: 2,
+                          ),
+                        ],
                       ),
-                      Text(
-                        _currentSong!.artist,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        maxLines: 1,
-                      ),
-                      const SizedBox(height: 4),
-                      // Buffer indicator
-                      LinearProgressIndicator(
-                        value: _bufferingProgress,
-                        backgroundColor: Colors.grey[300],
-                        minHeight: 2,
-                      ),
-                    ],
-                  ),
-                ),
-                // Play/pause button
-                IconButton(
-                  icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-                  iconSize: 32,
-                  onPressed: _audioPlayerService.togglePlayback,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatDuration(_totalDuration),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -156,15 +236,6 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
                 icon: const Icon(Icons.skip_next),
                 iconSize: 28,
                 onPressed: _audioPlayerService.playNextSong,
-              ),
-              
-              // Mode indicator
-              IconButton(
-                icon: Icon(
-                  _playbackMode == PlaybackMode.shuffle ? Icons.shuffle : Icons.repeat,
-                  color: _playbackMode == PlaybackMode.shuffle ? Colors.green : Colors.grey,
-                ),
-                onPressed: _audioPlayerService.togglePlaybackMode,
               ),
             ],
           ),

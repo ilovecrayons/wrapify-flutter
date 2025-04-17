@@ -5,13 +5,16 @@ import '../models/sync_job.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/audio_player_service.dart';
-import '../widgets/now_playing_bar.dart';
-import '../widgets/playback_controls.dart';
 
 class PlaylistScreen extends StatefulWidget {
   final String playlistId;
+  final VoidCallback? onBack;
 
-  const PlaylistScreen({super.key, required this.playlistId});
+  const PlaylistScreen({
+    super.key, 
+    required this.playlistId,
+    this.onBack,
+  });
 
   @override
   State<PlaylistScreen> createState() => _PlaylistScreenState();
@@ -28,7 +31,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   bool _isSyncing = false;
   Song? _currentSong;
   bool _isPlaying = false;
-  double _bufferingProgress = 0.0;
   PlaybackMode _playbackMode = PlaybackMode.linear;
   SyncJob? _syncJob;
   
@@ -57,14 +59,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       if (mounted) {
         setState(() {
           _isPlaying = state.isPlaying;
-        });
-      }
-    });
-
-    _audioPlayerService.bufferingProgressStream.listen((progress) {
-      if (mounted) {
-        setState(() {
-          _bufferingProgress = progress;
         });
       }
     });
@@ -559,6 +553,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         title: Text(_playlist?.name ?? 'Playlist'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        leading: widget.onBack != null 
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onBack,
+              )
+            : null,
         actions: [
           if (_isSyncing && _syncJob != null)
             Center(
@@ -594,34 +594,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               tooltip: 'Show song errors',
               onPressed: _showErrorSongsDialog,
             ),
-          
-          IconButton(
-            icon: Icon(
-              _playbackMode == PlaybackMode.shuffle 
-                ? Icons.shuffle 
-                : Icons.sort,
-              color: _playbackMode == PlaybackMode.shuffle 
-                ? Colors.white 
-                : Colors.white70,
-            ),
-            tooltip: _playbackMode == PlaybackMode.shuffle 
-                ? 'Switch to linear playback' 
-                : 'Switch to shuffle playback',
-            onPressed: () {
-              _audioPlayerService.togglePlaybackMode();
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    _playbackMode == PlaybackMode.linear 
-                      ? 'Switched to shuffle mode' 
-                      : 'Switched to linear mode'
-                  ),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
-          ),
+            
           IconButton(
             icon: Icon(
               _audioPlayerService.optimizedModeEnabled
@@ -651,21 +624,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               value: _syncJob!.progress > 0 ? _syncJob!.progress : null,
               backgroundColor: Colors.grey[300],
               valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
-            ),
-            
-          if (_currentSong != null)
-            NowPlayingBar(
-              song: _currentSong!,
-              isPlaying: _isPlaying,
-              bufferingProgress: _bufferingProgress,
-              onTap: () => _audioPlayerService.togglePlayback(),
-            ),
-
-          if (_currentSong != null)
-            PlaybackControls(
-              audioPlayerService: _audioPlayerService,
-              isPlaying: _isPlaying,
-              playbackMode: _playbackMode,
             ),
 
           Expanded(

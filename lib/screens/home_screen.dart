@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import '../models/playlist.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
-import 'playlist_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.title});
-
   final String title;
+  final Function(String)? onPlaylistSelected;
+
+  const HomeScreen({
+    super.key, 
+    required this.title, 
+    this.onPlaylistSelected,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -279,14 +283,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: Text(playlist.name),
                       subtitle: Text('${playlist.songIds.length} songs'),
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PlaylistScreen(
-                              playlistId: playlist.id,
-                            ),
-                          ),
-                        );
+                        // Use the callback for navigation instead of Navigator.push
+                        if (widget.onPlaylistSelected != null) {
+                          widget.onPlaylistSelected!(playlist.id);
+                        }
                       },
                       trailing: IconButton(
                         icon: const Icon(Icons.delete),
