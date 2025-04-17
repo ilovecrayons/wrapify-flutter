@@ -83,6 +83,39 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
     return "$minutes:$seconds";
   }
 
+  // Helper to get the appropriate icon for the current playback mode
+  Widget _getPlaybackModeIcon() {
+    switch (_playbackMode) {
+      case PlaybackMode.linear:
+        return Icon(
+          Icons.format_list_numbered, // Changed to list icon for linear mode
+          color: Colors.grey[600],
+        );
+      case PlaybackMode.shuffle:
+        return Icon(
+          Icons.shuffle,
+          color: Colors.green,
+        );
+      case PlaybackMode.loop:
+        return Icon(
+          Icons.repeat_one,
+          color: Colors.blue,
+        );
+    }
+  }
+
+  // Helper to get tooltip text for the current playback mode
+  String _getPlaybackModeTooltip() {
+    switch (_playbackMode) {
+      case PlaybackMode.linear:
+        return 'Linear mode (tap to change)';
+      case PlaybackMode.shuffle:
+        return 'Shuffle mode (tap to change)';
+      case PlaybackMode.loop:
+        return 'Loop current song (tap to change)';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Don't show anything if no song is currently playing/loaded
@@ -93,6 +126,9 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
     final double progressValue = _totalDuration.inMilliseconds > 0 
         ? _currentPosition.inMilliseconds / _totalDuration.inMilliseconds 
         : 0.0;
+
+    // Determine if skip buttons should be disabled (when in loop mode)
+    final bool isLoopMode = _playbackMode == PlaybackMode.loop;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -151,16 +187,11 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
                       iconSize: 32,
                       onPressed: _audioPlayerService.togglePlayback,
                     ),
-                    // Playback mode toggle moved here
+                    // Playback mode toggle with updated icons
                     IconButton(
-                      icon: Icon(
-                        _playbackMode == PlaybackMode.shuffle ? Icons.shuffle : Icons.repeat,
-                        color: _playbackMode == PlaybackMode.shuffle ? Colors.green : Colors.grey,
-                      ),
+                      icon: _getPlaybackModeIcon(),
                       onPressed: _audioPlayerService.togglePlaybackMode,
-                      tooltip: _playbackMode == PlaybackMode.shuffle 
-                          ? 'Shuffle mode (tap to change)' 
-                          : 'Linear mode (tap to change)',
+                      tooltip: _getPlaybackModeTooltip(),
                     ),
                   ],
                 ),
@@ -217,11 +248,15 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Previous button
+              // Previous button - disabled in loop mode
               IconButton(
-                icon: const Icon(Icons.skip_previous),
+                icon: Icon(
+                  Icons.skip_previous,
+                  color: isLoopMode ? Colors.grey[400] : null,
+                ),
                 iconSize: 28,
-                onPressed: _audioPlayerService.playPreviousSong,
+                onPressed: isLoopMode ? null : _audioPlayerService.playPreviousSong,
+                tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Previous song',
               ),
               
               // Play/Pause button
@@ -231,11 +266,15 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
                 onPressed: _audioPlayerService.togglePlayback,
               ),
               
-              // Next button
+              // Next button - disabled in loop mode
               IconButton(
-                icon: const Icon(Icons.skip_next),
+                icon: Icon(
+                  Icons.skip_next,
+                  color: isLoopMode ? Colors.grey[400] : null,
+                ),
                 iconSize: 28,
-                onPressed: _audioPlayerService.playNextSong,
+                onPressed: isLoopMode ? null : _audioPlayerService.playNextSong,
+                tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Next song',
               ),
             ],
           ),

@@ -7,7 +7,8 @@ import '../models/song.dart';
 
 enum PlaybackMode {
   linear,
-  shuffle
+  shuffle,
+  loop // New loop mode for repeating a single song
 }
 
 class AudioPlayerService {
@@ -115,7 +116,13 @@ class AudioPlayerService {
     // Listen for playback completion to play next song
     audioPlayer.playerStateStream.listen((playerState) {
       if (playerState.processingState == ProcessingState.completed) {
-        playNextSong();
+        if (_playbackMode == PlaybackMode.loop && _currentSong != null) {
+          // If in loop mode, replay the current song instead of moving to next song
+          _replayCurrentSong();
+        } else {
+          // Otherwise proceed to the next song
+          playNextSong();
+        }
       }
     });
     
@@ -326,24 +333,40 @@ class AudioPlayerService {
     }
   }
   
-  // Toggle between linear and shuffle modes
+  // Cycle through playback modes (linear -> shuffle -> loop -> linear)
   void togglePlaybackMode() {
     // Save current song
     Song? currentSong = _currentSong;
     
-    // Toggle mode
-    PlaybackMode newMode = _playbackMode == PlaybackMode.linear 
-        ? PlaybackMode.shuffle 
-        : PlaybackMode.linear;
+    // Cycle through modes
+    PlaybackMode newMode;
+    switch (_playbackMode) {
+      case PlaybackMode.linear:
+        newMode = PlaybackMode.shuffle;
+        break;
+      case PlaybackMode.shuffle:
+        newMode = PlaybackMode.loop;
+        break;
+      case PlaybackMode.loop:
+        newMode = PlaybackMode.linear;
+        break;
+    }
     
-    print('Toggling playback mode from ${_playbackMode.toString()} to ${newMode.toString()}');
+    print('Changing playback mode from ${_playbackMode.toString()} to ${newMode.toString()}');
     _playbackMode = newMode;
+    
+    // If switching to loop mode, set the loop mode in the player
+    if (_playbackMode == PlaybackMode.loop) {
+      audioPlayer.setLoopMode(LoopMode.one);
+    } else {
+      audioPlayer.setLoopMode(LoopMode.off);
+    }
     
     // Notify listeners
     _playbackModeController.add(_playbackMode);
     
-    // If we have a current song, find its index in the new active queue
-    if (currentSong != null) {
+    // If we have a current song and not in loop mode, find its index in the new active queue
+    if (currentSong != null && _playbackMode != PlaybackMode.loop) {
       int newIndex = _playbackQueue.indexWhere((song) => song.id == currentSong.id);
       if (newIndex != -1) {
         _currentIndex = newIndex;
@@ -356,6 +379,12 @@ class AudioPlayerService {
   
   // Play the next song in the queue
   Future<void> playNextSong() async {
+    // If in loop mode, just restart the current song
+    if (_playbackMode == PlaybackMode.loop && _currentSong != null) {
+      await _replayCurrentSong();
+      return;
+    }
+    
     // Basic validation
     if (_playbackQueue.isEmpty || _currentIndex < 0) {
       print('Skip prevented: empty queue or invalid index');
@@ -440,6 +469,12 @@ class AudioPlayerService {
   
   // Play the previous song in the queue
   Future<void> playPreviousSong() async {
+    // If in loop mode, just restart the current song
+    if (_playbackMode == PlaybackMode.loop && _currentSong != null) {
+      await _replayCurrentSong();
+      return;
+    }
+    
     // Basic validation
     if (_playbackQueue.isEmpty || _currentIndex < 0) {
       print('Skip prevented: empty queue or invalid index');
@@ -587,6 +622,23 @@ class AudioPlayerService {
     
     // Pre-cache the next song
     preCacheSong(nextSong);
+  }
+  
+  // New method to replay the current song in loop mode
+  Future<void> _replayCurrentSong() async {
+    if (_currentSong == null) return;
+    
+    try {
+      // Reset position to beginning
+      await audioPlayer.seek(Duration.zero);
+      // Start playback again
+      await audioPlayer.play();
+      
+      print('Looping song: ${_currentSong!.title}');
+    } catch (e) {
+      print('Error looping song: $e');
+      _handlePlaybackError(e);
+    }
   }
   
   void togglePlayback() {
