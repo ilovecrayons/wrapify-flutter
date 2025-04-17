@@ -295,14 +295,40 @@ class AudioPlayerService {
   void setPlaylist(List<Song> songs, {int startIndex = 0, bool autoPlay = false}) {
     if (songs.isEmpty) return;
     
-    // Store the original playlist
-    _currentPlaylist = List.from(songs);
+    // Filter out ignored songs
+    final filteredSongs = songs.where((song) => !song.isIgnored).toList();
+    
+    // If all songs are ignored, keep the original list but don't play anything
+    if (filteredSongs.isEmpty) {
+      print('All songs in playlist are ignored');
+      _currentPlaylist = List.from(songs);
+      return;
+    }
+    
+    // Store the filtered playlist
+    _currentPlaylist = List.from(filteredSongs);
     
     // Create both linear and shuffled queues
     _rebuildQueues();
     
+    // Find the appropriate start index if the requested song is not ignored
+    int actualIndex = startIndex;
+    if (songs[startIndex].isIgnored) {
+      // Find the first non-ignored song
+      final firstNonIgnoredIndex = songs.indexWhere((song) => !song.isIgnored);
+      if (firstNonIgnoredIndex >= 0) {
+        actualIndex = 0; // Use the first song in the filtered list
+      } else {
+        return; // No playable songs
+      }
+    } else {
+      // Find the position of the requested song in the filtered list
+      actualIndex = filteredSongs.indexWhere((s) => s.id == songs[startIndex].id);
+      if (actualIndex < 0) actualIndex = 0;
+    }
+    
     // Set the current index based on the active queue
-    int actualIndex = min(startIndex, _playbackQueue.length - 1);
+    actualIndex = min(actualIndex, _playbackQueue.length - 1);
     _currentIndex = actualIndex;
     
     if (autoPlay) {

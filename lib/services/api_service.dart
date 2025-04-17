@@ -15,6 +15,7 @@ class ApiService {
   static const String _streamBaseUrl = '$_baseUrl/stream';
   static const String _syncStatusUrl = '$_baseUrl/syncstatus';
   static const String _playlistErrorsUrl = '$_baseUrl/playlist-errors';
+  static const String _resyncSongUrl = '$_baseUrl/resyncsong';
   
   // Create an HTTP client that accepts all certificates
   http.Client _createClient() {
@@ -131,6 +132,29 @@ class ApiService {
         'errorCount': 0,
         'songs': []
       };
+    }
+  }
+
+  // Resync a specific song that might have issues
+  Future<Map<String, dynamic>> resyncSong(String songId) async {
+    try {
+      final client = HttpClient()
+        ..badCertificateCallback = 
+            ((X509Certificate cert, String host, int port) => true);
+            
+      final request = await client.postUrl(Uri.parse('$_resyncSongUrl/$songId'));
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(responseBody);
+      } else {
+        final errorData = jsonDecode(responseBody);
+        throw Exception(errorData['message'] ?? 'Failed to resync song');
+      }
+    } catch (e) {
+      print('Error resyncing song: $e');
+      throw Exception('Failed to resync song: $e');
     }
   }
 

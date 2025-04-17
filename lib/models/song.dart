@@ -6,6 +6,7 @@ class Song {
   final Map<String, dynamic>? externalUrls;
   final String? errorMessage;
   final bool hasError;
+  final bool isIgnored;
 
   Song({
     required this.id,
@@ -15,6 +16,7 @@ class Song {
     this.externalUrls,
     this.errorMessage,
     this.hasError = false,
+    this.isIgnored = false,
   });
 
   // Convert to a map for storage
@@ -27,6 +29,7 @@ class Song {
       'external_urls': externalUrls,
       'error_message': errorMessage,
       'has_error': hasError,
+      'is_ignored': isIgnored,
     };
   }
 
@@ -43,6 +46,7 @@ class Song {
       externalUrls: json['external_urls'],
       errorMessage: json['error_message'] ?? json['errorMessage'],
       hasError: hasError,
+      isIgnored: json['is_ignored'] == true,
     );
   }
   
@@ -56,6 +60,21 @@ class Song {
       externalUrls: externalUrls,
       errorMessage: error,
       hasError: true,
+      isIgnored: isIgnored,
+    );
+  }
+  
+  // Create a copy of this song with the ignored flag toggled
+  Song copyWithIgnored(bool ignored) {
+    return Song(
+      id: id,
+      title: title,
+      artist: artist,
+      imageUrl: imageUrl,
+      externalUrls: externalUrls,
+      errorMessage: errorMessage,
+      hasError: hasError,
+      isIgnored: ignored,
     );
   }
 }

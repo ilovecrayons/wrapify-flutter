@@ -76,16 +76,17 @@ class StorageService {
     final existingSongs = await loadSongs();
     
     for (final song in songs) {
-      // If the song already exists with an error, preserve error status
-      if (existingSongs.containsKey(song.id) && existingSongs[song.id]!.hasError) {
+      // If the song already exists, preserve error status and ignored status
+      if (existingSongs.containsKey(song.id)) {
         existingSongs[song.id] = Song(
           id: song.id,
           title: song.title,
           artist: song.artist,
           imageUrl: song.imageUrl,
           externalUrls: song.externalUrls,
-          errorMessage: existingSongs[song.id]!.errorMessage,
-          hasError: true,
+          errorMessage: existingSongs[song.id]!.hasError ? existingSongs[song.id]!.errorMessage : song.errorMessage,
+          hasError: existingSongs[song.id]!.hasError,
+          isIgnored: existingSongs[song.id]!.isIgnored,
         );
       } else {
         existingSongs[song.id] = song;
@@ -93,6 +94,45 @@ class StorageService {
     }
     
     await saveSongs(existingSongs);
+  }
+
+  // Toggle a song's ignored status
+  Future<Song> toggleSongIgnored(String songId, bool isIgnored) async {
+    final existingSongs = await loadSongs();
+    
+    if (existingSongs.containsKey(songId)) {
+      final updatedSong = existingSongs[songId]!.copyWithIgnored(isIgnored);
+      existingSongs[songId] = updatedSong;
+      await saveSongs(existingSongs);
+      return updatedSong;
+    } else {
+      throw Exception('Song not found');
+    }
+  }
+
+  // Update a song with new data (for resyncing)
+  Future<Song> updateSong(Song song) async {
+    final existingSongs = await loadSongs();
+    
+    // Preserve the ignored status from the existing song if it exists
+    final bool shouldBeIgnored = existingSongs.containsKey(song.id) 
+        ? existingSongs[song.id]!.isIgnored 
+        : false;
+    
+    final updatedSong = Song(
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      imageUrl: song.imageUrl,
+      externalUrls: song.externalUrls,
+      errorMessage: song.errorMessage,
+      hasError: song.hasError,
+      isIgnored: shouldBeIgnored,
+    );
+    
+    existingSongs[song.id] = updatedSong;
+    await saveSongs(existingSongs);
+    return updatedSong;
   }
 
   // Save song errors

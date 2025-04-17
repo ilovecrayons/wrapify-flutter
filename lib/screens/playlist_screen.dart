@@ -411,7 +411,17 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       return;
     }
     
-    _audioPlayerService.setPlaylist(_songs.where((s) => !_songHasError(s.id)).toList(), 
+    if (song.isIgnored) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('This song is set to be ignored during playback'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
+    _audioPlayerService.setPlaylist(_songs.where((s) => !_songHasError(s.id) && !s.isIgnored).toList(), 
       startIndex: _songs.indexWhere((s) => s.id == song.id),
       autoPlay: false);
       
@@ -539,6 +549,179 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         _isSyncing = false;
       });
     }
+  }
+
+  Future<void> _resyncSong(Song song) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Resyncing "${song.title}"...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      
+      final result = await _apiService.resyncSong(song.id);
+      
+      if (result['success'] == true) {
+        final updatedSong = Song(
+          id: song.id,
+          title: song.title,
+          artist: song.artist,
+          imageUrl: song.imageUrl,
+          externalUrls: song.externalUrls,
+          errorMessage: null,
+          hasError: false,
+          isIgnored: song.isIgnored,
+        );
+        
+        await _storageService.updateSong(updatedSong);
+        
+        setState(() {
+          if (_songErrorMessages.containsKey(song.id)) {
+            _songErrorMessages.remove(song.id);
+          }
+          
+          final songIndex = _songs.indexWhere((s) => s.id == song.id);
+          if (songIndex >= 0) {
+            _songs[songIndex] = updatedSong;
+          }
+          
+          _errorCount = _songErrorMessages.length;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully resynced "${song.title}"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        _audioPlayerService.clearCache(songId: song.id);
+        _audioPlayerService.preCacheSong(updatedSong);
+      } else {
+        throw Exception(result['message'] ?? 'Unknown error');
+      }
+    } catch (e) {
+      print('Error resyncing song: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to resync song: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  Future<void> _toggleIgnoreSong(Song song) async {
+    try {
+      final newIgnoreState = !song.isIgnored;
+      
+      final updatedSong = await _storageService.toggleSongIgnored(song.id, newIgnoreState);
+      
+      setState(() {
+        final songIndex = _songs.indexWhere((s) => s.id == song.id);
+        if (songIndex >= 0) {
+          _songs[songIndex] = updatedSong;
+        }
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(newIgnoreState 
+            ? 'Song "${song.title}" will be skipped during playback'
+            : 'Song "${song.title}" will be included in playback'),
+          backgroundColor: newIgnoreState ? Colors.orange : Colors.green,
+        ),
+      );
+      
+      if (newIgnoreState && _currentSong?.id == song.id && _isPlaying) {
+        _audioPlayerService.playNextSong();
+      }
+      
+      if (_playlist != null && _playlist!.songIds.contains(song.id)) {
+        _audioPlayerService.setPlaylist(
+          _songs.where((s) => _playlist!.songIds.contains(s.id)).toList(),
+          startIndex: _songs.indexWhere((s) => s.id == _currentSong?.id),
+          autoPlay: false,
+        );
+      }
+    } catch (e) {
+      print('Error toggling song ignored state: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update song: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  void _showSongActionsMenu(Song song) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: CircleAvatar(
+              backgroundImage: song.imageUrl != null 
+                ? NetworkImage(song.imageUrl!) 
+                : null,
+              child: song.imageUrl == null ? Icon(Icons.music_note) : null,
+            ),
+            title: Text(song.title),
+            subtitle: Text(song.artist),
+          ),
+          Divider(),
+          
+          ListTile(
+            leading: Icon(Icons.refresh),
+            title: Text('Resync song'),
+            subtitle: Text(song.hasError
+              ? 'Attempt to fix error by redownloading'
+              : 'Download this song again'),
+            onTap: () {
+              Navigator.pop(context);
+              _resyncSong(song);
+            },
+          ),
+          
+          ListTile(
+            leading: Icon(song.isIgnored ? Icons.check_circle : Icons.not_interested),
+            title: Text(song.isIgnored ? 'Include in playback' : 'Ignore during playback'),
+            subtitle: Text(song.isIgnored 
+              ? 'Stop skipping this song' 
+              : 'Skip this song when playing the playlist'),
+            onTap: () {
+              Navigator.pop(context);
+              _toggleIgnoreSong(song);
+            },
+          ),
+          
+          if (song.hasError)
+            ListTile(
+              leading: Icon(Icons.error_outline, color: Colors.red),
+              title: Text('View error details'),
+              onTap: () {
+                Navigator.pop(context);
+                _showErrorDetails(song);
+              },
+            ),
+            
+          if (!song.hasError && !song.isIgnored)
+            ListTile(
+              leading: Icon(Icons.play_circle_filled, color: Theme.of(context).primaryColor),
+              title: Text('Play this song'),
+              onTap: () {
+                Navigator.pop(context);
+                _playSong(song);
+              },
+            ),
+            
+          SizedBox(height: 8),
+        ],
+      ),
+    );
   }
 
   @override
@@ -707,9 +890,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                     ),
                                   )
                                 : Text(song.artist),
-                            onTap: () => hasError 
-                                ? _showErrorDetails(song)
-                                : _playSong(song),
+                            onTap: () => _playSong(song),
+                            onLongPress: () => _showSongActionsMenu(song),
                             trailing: hasError
                                 ? IconButton(
                                     icon: const Icon(Icons.error, color: Colors.red),
