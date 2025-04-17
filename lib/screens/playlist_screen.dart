@@ -254,53 +254,107 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         return;
       }
 
+      // Use Dialog instead of AlertDialog for more flexibility with large content
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Song Errors (${displayErrorSongs.length})'),
-          content: SizedBox(
+        builder: (context) => Dialog(
+          insetPadding: EdgeInsets.all(16.0),
+          child: Container(
             width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: displayErrorSongs.length,
-              itemBuilder: (context, index) {
-                final song = displayErrorSongs[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8, // 80% of screen height
+              maxWidth: 600,
+            ),
+            padding: EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.error, color: Colors.red, size: 20),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              song.title,
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Padding(
-                        padding: EdgeInsets.only(left: 28.0, top: 4.0),
-                        child: Text(
-                          song.errorMessage ?? 'Unknown error',
-                          style: TextStyle(color: Colors.red),
+                      Text(
+                        'Song Errors (${displayErrorSongs.length})',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+                if (displayErrorSongs.length > 5)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      'Scroll to see all ${displayErrorSongs.length} errors',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                Flexible(
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    thickness: 6.0,
+                    radius: Radius.circular(10.0),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: displayErrorSongs.length,
+                      separatorBuilder: (context, index) => Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final song = displayErrorSongs[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.error, color: Colors.red, size: 20),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      song.title,
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: EdgeInsets.only(left: 28.0, top: 4.0),
+                                child: Text(
+                                  song.errorMessage ?? 'Unknown error',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
         ),
       );
     });
