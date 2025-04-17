@@ -49,8 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Syncing playlist... This may take a while.'),
-          duration: Duration(seconds: 3),
+          content: Text('Starting playlist sync...'),
+          duration: Duration(seconds: 2),
         ),
       );
 
@@ -78,24 +78,30 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Start syncing the playlist (this won't wait for completion)
-      await _apiService.syncPlaylist(spotifyUrl);
-
-      // Create a placeholder playlist until we get full details
+      // Start syncing the playlist (this returns immediately with job details)
+      final syncJob = await _apiService.syncPlaylist(spotifyUrl);
+      
+      // Create a placeholder playlist with the name from the API
       final newPlaylist = Playlist(
         id: playlistId,
-        name: 'New Playlist (syncing...)',
+        name: syncJob.playlistName,
         spotifyUrl: spotifyUrl,
+        syncJobId: syncJob.id,
       );
 
       // Save and update the UI
       await _storageService.addPlaylist(newPlaylist);
+      await _storageService.saveSyncJob(syncJob);
       await _loadPlaylists();
 
+      // Start polling for status updates in the background
+      _pollSyncStatus(syncJob.id, playlistId);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Playlist added! Songs are syncing in the background.'),
+        SnackBar(
+          content: Text('Added "${syncJob.playlistName}". Songs are syncing in the background.'),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
         ),
       );
     } catch (e) {
@@ -106,6 +112,89 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+  
+  // Poll for sync status updates
+  void _pollSyncStatus(String jobId, String playlistId) async {
+    bool isComplete = false;
+    int attempts = 0;
+    const maxAttempts = 30; // Poll for a maximum of 5 minutes (10 seconds * 30)
+    
+    while (!isComplete && attempts < maxAttempts) {
+      try {
+        await Future.delayed(Duration(seconds: 10));
+        final syncJob = await _apiService.getSyncStatus(jobId);
+        await _storageService.saveSyncJob(syncJob);
+        
+        print('Sync status: ${syncJob.status}, Progress: ${syncJob.progress}');
+        
+        // If the job is complete or has an error, stop polling
+        if (syncJob.isComplete || syncJob.isError) {
+          isComplete = true;
+          
+          // Update the playlist with the final information
+          if (syncJob.isComplete) {
+            // Reload playlists to get the updated one
+            if (mounted) {
+              await _loadPlaylists();
+              
+              // Check for any song errors
+              await _checkForSongErrors(playlistId);
+            }
+          } else if (syncJob.isError && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error syncing playlist: ${syncJob.error ?? "Unknown error"}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+        
+        attempts++;
+      } catch (e) {
+        print('Error polling sync status: $e');
+        attempts++;
+        
+        // If too many errors, just stop polling
+        if (attempts > 5) {
+          isComplete = true;
+        }
+      }
+    }
+  }
+  
+  // Check for song errors and update storage
+  Future<void> _checkForSongErrors(String playlistId) async {
+    try {
+      final errorsData = await _apiService.getPlaylistErrors(playlistId);
+      
+      if (errorsData['errorCount'] > 0 && errorsData['songs'] is List && errorsData['songs'].isNotEmpty) {
+        // Save the error information
+        await _storageService.saveSongErrors(
+          playlistId, 
+          List<Map<String, dynamic>>.from(errorsData['songs'])
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sync completed with ${errorsData['errorCount']} song errors'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Playlist sync completed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error checking for song errors: $e');
     }
   }
 

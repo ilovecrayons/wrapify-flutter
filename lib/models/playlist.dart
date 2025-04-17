@@ -4,6 +4,7 @@ class Playlist {
   final String? imageUrl;
   final String spotifyUrl;
   final List<String> songIds; // IDs of songs in this playlist
+  final String? syncJobId; // ID of the most recent sync job
 
   Playlist({
     required this.id,
@@ -11,6 +12,7 @@ class Playlist {
     this.imageUrl,
     required this.spotifyUrl,
     this.songIds = const [],
+    this.syncJobId,
   });
 
   // Convert to a map for storage
@@ -21,6 +23,7 @@ class Playlist {
       'imageUrl': imageUrl,
       'spotifyUrl': spotifyUrl,
       'songIds': songIds,
+      'syncJobId': syncJobId,
     };
   }
 
@@ -32,6 +35,7 @@ class Playlist {
       imageUrl: json['imageUrl'],
       spotifyUrl: json['spotifyUrl'],
       songIds: List<String>.from(json['songIds'] ?? []),
+      syncJobId: json['syncJobId'],
     );
   }
 }
