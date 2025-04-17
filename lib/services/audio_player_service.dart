@@ -11,6 +11,19 @@ enum PlaybackMode {
 }
 
 class AudioPlayerService {
+  // Singleton instance
+  static final AudioPlayerService _instance = AudioPlayerService._internal();
+  
+  // Factory constructor to return the singleton instance
+  factory AudioPlayerService() {
+    return _instance;
+  }
+  
+  // Private constructor for singleton implementation
+  AudioPlayerService._internal() {
+    _init();
+  }
+
   late final AudioPlayer audioPlayer;
   final String streamBaseUrl = 'https://wrapifyapi.dedyn.io/stream';
   Map<String, AudioSource> cachedSources = {};
@@ -57,10 +70,6 @@ class AudioPlayerService {
   Song? _currentSong;
   Song? get currentSong => _currentSong;
   PlaybackMode get playbackMode => _playbackMode;
-  
-  AudioPlayerService() {
-    _init();
-  }
   
   void _init() {
     audioPlayer = AudioPlayer();

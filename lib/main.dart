@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
-// TODO: make playback instance gobal even when playlist screen is exited
+import 'widgets/global_playback_bar.dart';
 // TODO: option to redownload songs on demand 
-// TODO: backend automated checks for corrupted downloads
-// TODO: playlist names
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +42,27 @@ class MyApp extends StatelessWidget {
           foregroundColor: Colors.white, // App bar text/icons color
         ),
       ),
-      home: const AudioServiceWidget(child: HomeScreen(title: 'Wrapify')),
+      home: const AudioServiceWidget(child: AppWithPlaybackBar()),
+    );
+  }
+}
+
+class AppWithPlaybackBar extends StatelessWidget {
+  const AppWithPlaybackBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          // Main content area (takes up all available space)
+          Expanded(
+            child: HomeScreen(title: 'Wrapify'),
+          ),
+          // Global playback bar (only takes the space it needs)
+          const GlobalPlaybackBar(),
+        ],
+      ),
     );
   }
 }
