@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
 import 'screens/playlist_screen.dart';
 import 'widgets/global_playback_bar.dart';
-// TODO: option to redownload songs on demand 
+
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,7 +63,7 @@ class _AppWithPlaybackBarState extends State<AppWithPlaybackBar> {
     super.initState();
     // Initialize with the HomeScreen and provide the navigation callback
     _currentScreen = HomeScreen(
-      title: 'Wrapify',
+      title: 'fuck spotify!!1!!11!1!',
       onPlaylistSelected: (playlistId) => navigateToPlaylist(playlistId),
     );
   }
@@ -82,7 +82,7 @@ class _AppWithPlaybackBarState extends State<AppWithPlaybackBar> {
   void navigateToHome() {
     setState(() {
       _currentScreen = HomeScreen(
-        title: 'Wrapify',
+        title: 'Home',
         onPlaylistSelected: (playlistId) => navigateToPlaylist(playlistId),
       );
     });

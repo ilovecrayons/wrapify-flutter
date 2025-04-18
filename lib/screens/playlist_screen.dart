@@ -42,8 +42,18 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     super.initState();
     _loadPlaylist();
     _setupListeners();
+    _syncIgnoredState();
     
     print('PlaylistScreen initialized for playlist ID: ${widget.playlistId}');
+  }
+
+  // Sync the ignored songs state at startup
+  Future<void> _syncIgnoredState() async {
+    try {
+      await _storageService.syncIgnoredSongsState();
+    } catch (e) {
+      print('Error syncing ignored songs state: $e');
+    }
   }
 
   void _setupListeners() {
@@ -103,34 +113,42 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
       await _storageService.addSongs(songs);
 
-      await _checkForSongErrors();
+      // Reload songs from storage to ensure isIgnored status is correctly applied
+      final allSongsFromStorage = await _storageService.loadSongs();
+      
+      // *** Always use the latest song IDs fetched from the API ***
+      final latestSongIds = songs.map((s) => s.id).toList();
 
-      if (playlist.songIds.isEmpty && songs.isNotEmpty) {
-        final updatedPlaylist = Playlist(
-          id: playlist.id,
-          name: playlist.name,
-          spotifyUrl: playlist.spotifyUrl,
-          imageUrl: songs.isNotEmpty ? songs.first.imageUrl : null,
-          songIds: songs.map((s) => s.id).toList(),
-          syncJobId: playlist.syncJobId,
-        );
+      final songsForState = latestSongIds
+          .map((id) => allSongsFromStorage[id])
+          .where((song) => song != null)
+          .cast<Song>()
+          .toList();
 
-        await _storageService.addPlaylist(updatedPlaylist);
-        setState(() {
-          _playlist = updatedPlaylist;
-          _songs = songs;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _playlist = playlist;
-          _songs = songs;
-          _isLoading = false;
-        });
-      }
+      await _checkForSongErrors(); // Check for errors *after* getting final song list
+
+      // *** Always update the playlist object with the latest song IDs ***
+      final updatedPlaylist = Playlist(
+        id: playlist.id,
+        name: playlist.name, // Keep existing name unless API provides update
+        spotifyUrl: playlist.spotifyUrl,
+        imageUrl: songs.isNotEmpty ? songs.first.imageUrl : playlist.imageUrl, // Update image if available
+        songIds: latestSongIds, // Use the latest IDs
+        syncJobId: playlist.syncJobId, // Keep existing sync job ID reference
+      );
+
+      await _storageService.addPlaylist(updatedPlaylist); // Save the updated playlist
+
+      setState(() {
+        _playlist = updatedPlaylist; // Update state with the corrected playlist
+        _songs = songsForState; // Update state with the songs corresponding to latest IDs
+        _isLoading = false;
+      });
+      
     } catch (e) {
       print('Error loading playlist: $e');
 
+      // Ensure error handling also loads from storage if possible
       final cachedSongs = await _storageService.loadSongs();
       final playlists = await _storageService.loadPlaylists();
       final playlist = playlists.firstWhere(
@@ -150,7 +168,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
       setState(() {
         _playlist = playlist;
-        _songs = playlistSongs;
+        _songs = playlistSongs; // Use songs loaded from cache
         _isLoading = false;
       });
 
@@ -421,8 +439,24 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       return;
     }
     
-    _audioPlayerService.setPlaylist(_songs.where((s) => !_songHasError(s.id) && !s.isIgnored).toList(), 
-      startIndex: _songs.indexWhere((s) => s.id == song.id),
+    // Filter the songs first
+    final playableSongs = _songs.where((s) => !_songHasError(s.id) && !s.isIgnored).toList();
+    // Calculate the index within the filtered list
+    final startIndexInPlayable = playableSongs.indexWhere((s) => s.id == song.id);
+
+    // Ensure the song was found in the playable list
+    if (startIndexInPlayable == -1) {
+       ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error finding song in playable list.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    _audioPlayerService.setPlaylist(playableSongs, 
+      startIndex: startIndexInPlayable, // Use the correct index
       autoPlay: false);
       
     await _audioPlayerService.playSong(song);
@@ -634,16 +668,37 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         ),
       );
       
+      // If the currently playing song is being ignored, skip to the next one
       if (newIgnoreState && _currentSong?.id == song.id && _isPlaying) {
         _audioPlayerService.playNextSong();
       }
       
-      if (_playlist != null && _playlist!.songIds.contains(song.id)) {
-        _audioPlayerService.setPlaylist(
-          _songs.where((s) => _playlist!.songIds.contains(s.id)).toList(),
-          startIndex: _songs.indexWhere((s) => s.id == _currentSong?.id),
-          autoPlay: false,
-        );
+      // Only update the audio player's playlist if there's a current playlist and we're playing music
+      if (_playlist != null && _playlist!.songIds.isNotEmpty) {
+        // Get all playable songs (not ignored, no errors)
+        final playableSongs = _songs.where((s) => 
+          _playlist!.songIds.contains(s.id) && 
+          !s.isIgnored && 
+          !_songHasError(s.id)
+        ).toList();
+        
+        // Only update the playlist if we have playable songs
+        if (playableSongs.isNotEmpty) {
+          // Find current song index in playable songs if one is playing, otherwise use 0
+          int currentIndex = 0;
+          if (_currentSong != null) {
+            final currentSongIndex = playableSongs.indexWhere((s) => s.id == _currentSong!.id);
+            if (currentSongIndex >= 0) {
+              currentIndex = currentSongIndex;
+            }
+          }
+          
+          _audioPlayerService.setPlaylist(
+            playableSongs,
+            startIndex: currentIndex,
+            autoPlay: false,
+          );
+        }
       }
     } catch (e) {
       print('Error toggling song ignored state: $e');
@@ -840,6 +895,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         itemBuilder: (context, index) {
                           final song = _songs[index];
                           final hasError = _songHasError(song.id);
+                          final isIgnored = song.isIgnored;
                           return ListTile(
                             leading: Stack(
                               alignment: Alignment.bottomRight,
@@ -853,8 +909,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                   ),
                                   child: song.imageUrl != null
                                       ? Image.network(song.imageUrl!,
-                                          fit: BoxFit.cover)
-                                      : const Icon(Icons.music_note),
+                                          fit: BoxFit.cover,
+                                          color: isIgnored ? Colors.grey : null,
+                                          colorBlendMode: isIgnored ? BlendMode.saturation : null,
+                                         )
+                                      : Icon(Icons.music_note, color: isIgnored ? Colors.grey : null),
                                 ),
                                 if (hasError)
                                   Container(
@@ -872,13 +931,30 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                       ),
                                     ),
                                   ),
+                                if (isIgnored && !hasError)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    width: 16,
+                                    height: 16,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.not_interested,
+                                        size: 12,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                             title: Text(
                               song.title,
                               style: TextStyle(
-                                color: hasError ? Colors.grey : null,
+                                color: isIgnored ? Colors.grey : (hasError ? Colors.grey : null),
                                 decoration: hasError ? TextDecoration.lineThrough : null,
+                                fontStyle: isIgnored ? FontStyle.italic : null,
                               ),
                             ),
                             subtitle: hasError 
@@ -889,7 +965,16 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                       fontSize: 12,
                                     ),
                                   )
-                                : Text(song.artist),
+                                : isIgnored
+                                    ? Text(
+                                        'Ignored - ${song.artist}',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      )
+                                    : Text(song.artist),
                             onTap: () => _playSong(song),
                             onLongPress: () => _showSongActionsMenu(song),
                             trailing: hasError
@@ -898,9 +983,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                     tooltip: _getErrorMessage(song.id) ?? 'Unknown error',
                                     onPressed: () => _showErrorDetails(song),
                                   )
-                                : _currentSong?.id == song.id && _isPlaying
-                                    ? const Icon(Icons.volume_up, color: Colors.green)
-                                    : null,
+                                : isIgnored
+                                    ? IconButton(
+                                        icon: const Icon(Icons.not_interested, color: Colors.orange),
+                                        tooltip: 'This song will be skipped during playback',
+                                        onPressed: () => _showSongActionsMenu(song),
+                                      )
+                                    : _currentSong?.id == song.id && _isPlaying
+                                        ? const Icon(Icons.volume_up, color: Colors.green)
+                                        : null,
                           );
                         },
                       ),

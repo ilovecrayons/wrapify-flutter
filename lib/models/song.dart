@@ -60,7 +60,7 @@ class Song {
       externalUrls: externalUrls,
       errorMessage: error,
       hasError: true,
-      isIgnored: isIgnored,
+      isIgnored: isIgnored,  // Preserve the ignored status
     );
   }
   
