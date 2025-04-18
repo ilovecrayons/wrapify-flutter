@@ -44,7 +44,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     _setupListeners();
     _syncIgnoredState();
     
-    print('PlaylistScreen initialized for playlist ID: ${widget.playlistId}');
   }
 
   // Sync the ignored songs state at startup
@@ -52,7 +51,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     try {
       await _storageService.syncIgnoredSongsState();
     } catch (e) {
-      print('Error syncing ignored songs state: $e');
     }
   }
 
@@ -146,7 +144,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       });
       
     } catch (e) {
-      print('Error loading playlist: $e');
 
       // Ensure error handling also loads from storage if possible
       final cachedSongs = await _storageService.loadSongs();
@@ -187,7 +184,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     try {
       final errorsData = await _apiService.getPlaylistErrors(widget.playlistId);
 
-      print('【ERROR DEBUG】Raw error data from API: $errorsData');
 
       _songErrorMessages.clear();
 
@@ -201,7 +197,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           _songErrorMessages[songId] = errorMessage;
         }
 
-        print('【ERROR DEBUG】Found ${errorSongsList.length} songs with errors: $_songErrorMessages');
 
         await _storageService.saveSongErrors(widget.playlistId, errorSongsList);
 
@@ -209,13 +204,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           _errorCount = _songErrorMessages.length;
         });
       } else {
-        print('【ERROR DEBUG】No errors found in the playlist.');
         setState(() {
           _errorCount = 0;
         });
       }
     } catch (e) {
-      print('Error checking for song errors: $e');
     }
   }
 
@@ -228,7 +221,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   }
 
   void _showErrorSongsDialog() {
-    print('Opening error dialog with direct access to error songs');
     
     _refreshErrorInformation().then((_) {
       final displayErrorSongs = _songs.where((song) => _songHasError(song.id)).map((song) {
@@ -243,13 +235,10 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         );
       }).toList();
 
-      print('【ERROR DEBUG】Error songs found for dialog: ${displayErrorSongs.length}');
       for (var song in displayErrorSongs) {
-        print('【ERROR DEBUG】Error song in dialog: ${song.title} - ${song.id} - ${song.errorMessage}');
       }
 
       if (displayErrorSongs.isEmpty) {
-        print('No error songs found, displaying a message');
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -387,7 +376,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           _songErrorMessages[songId] = errorMessage;
         }
         
-        print('【ERROR DEBUG】Refreshed error info: ${_songErrorMessages.length} errors');
         
         setState(() {
           _errorCount = _songErrorMessages.length;
@@ -398,7 +386,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         });
       }
     } catch (e) {
-      print('Error refreshing error information: $e');
     }
   }
 
@@ -473,7 +460,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         final syncJob = await _apiService.getSyncStatus(jobId);
         await _storageService.saveSyncJob(syncJob);
         
-        print('Sync status: ${syncJob.status}, Progress: ${syncJob.progress}');
         
         if (mounted) {
           setState(() {
@@ -500,7 +486,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         
         attempts++;
       } catch (e) {
-        print('Error polling sync status: $e');
         attempts++;
         
         if (attempts > 5) {
@@ -571,7 +556,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         ),
       );
     } catch (e) {
-      print('Error syncing playlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error syncing playlist: $e'),
@@ -636,7 +620,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         throw Exception(result['message'] ?? 'Unknown error');
       }
     } catch (e) {
-      print('Error resyncing song: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to resync song: $e'),
@@ -701,7 +684,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         }
       }
     } catch (e) {
-      print('Error toggling song ignored state: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to update song: $e'),

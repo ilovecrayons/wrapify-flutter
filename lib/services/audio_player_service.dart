@@ -86,11 +86,9 @@ class AudioPlayerService {
       isBlueStacks = osVersion.contains('bluestacks') || osVersion.contains('bs');
       
       if (isBlueStacks) {
-        print('🎮 BlueStacks detected - using specialized settings');
         isEmulator = true;
         optimizedModeEnabled = true;
       } else if (isEmulator) {
-        print('🔍 Standard emulator detected - applying optimized settings');
         optimizedModeEnabled = true;
       }
     }
@@ -109,7 +107,6 @@ class AudioPlayerService {
           audioPlayer.setVolume(0.9);
         }
       } catch (e) {
-        print('Error setting Android audio params: $e');
       }
     }
     
@@ -145,16 +142,13 @@ class AudioPlayerService {
       ));
       
     }, onError: (Object e, StackTrace stackTrace) {
-      print('Error in playback stream: $e');
       _handlePlaybackError(e);
     }, cancelOnError: false);
     
     // Monitor buffer state for adaptive buffering
     audioPlayer.processingStateStream.listen((state) {
-      print('Processing state: $state');
       
       if (state == ProcessingState.buffering) {
-        print('Buffering - reducing UI updates');
         
         if (optimizedModeEnabled) {
           _reduceResourceUsage(true);
@@ -162,7 +156,6 @@ class AudioPlayerService {
       }
       
       if (state == ProcessingState.ready) {
-        print('Ready to play');
         retryCount = 0;
         
         if (optimizedModeEnabled) {
@@ -180,7 +173,6 @@ class AudioPlayerService {
     // Add position reporting for diagnosing stutters
     audioPlayer.positionStream.listen((position) {
       if (position.inSeconds % 5 == 0 && position.inSeconds > 0) {
-        print('Playback position: $position (buffer: ${bufferingProgress.toStringAsFixed(2)}%)');
       }
     });
   }
@@ -209,7 +201,6 @@ class AudioPlayerService {
         final currentBufferPos = (bufferingProgress * 100).round();
         
         if (currentBufferPos == lastBufferPosition && currentBufferPos < 10) {
-          print('⚠️ Buffer stalled at $currentBufferPos% - applying recovery');
           _recoverFromBufferStall();
         }
         
@@ -266,27 +257,21 @@ class AudioPlayerService {
         cachedSources[song.id] = audioSource;
       }
       
-      print('Pre-caching song: ${song.title}');
     } catch (e) {
-      print('Error pre-caching song: $e');
     }
   }
   
   Future<void> clearCache({String? songId}) async {
     try {
       await AudioPlayer.clearAssetCache();
-      print('Cleared audio cache');
     } catch (e) {
-      print('Error clearing cache: $e');
     }
   }
   
   void _handlePlaybackError(dynamic error) {
-    print('Playback error occurred: $error');
     
     // Skip to next song on error instead of retrying the same song
     if (_currentSong != null) {
-      print('Skipping problematic song: ${_currentSong!.title}');
       playNextSong();
     }
   }
@@ -300,7 +285,6 @@ class AudioPlayerService {
     
     // If all songs are ignored, keep the original list but don't play anything
     if (filteredSongs.isEmpty) {
-      print('All songs in playlist are ignored');
       _currentPlaylist = List.from(songs);
       return;
     }
@@ -345,7 +329,6 @@ class AudioPlayerService {
     _shuffledQueue = List.from(_currentPlaylist);
     _shuffleQueue(_shuffledQueue);
     
-    print('Queues rebuilt - Linear: ${_linearQueue.length}, Shuffled: ${_shuffledQueue.length}');
   }
   
   // Shuffle a queue using Fisher-Yates algorithm
@@ -378,7 +361,6 @@ class AudioPlayerService {
         break;
     }
     
-    print('Changing playback mode from ${_playbackMode.toString()} to ${newMode.toString()}');
     _playbackMode = newMode;
     
     // If switching to loop mode, set the loop mode in the player
@@ -396,9 +378,7 @@ class AudioPlayerService {
       int newIndex = _playbackQueue.indexWhere((song) => song.id == currentSong.id);
       if (newIndex != -1) {
         _currentIndex = newIndex;
-        print('Current song found at position $_currentIndex in the new queue');
       } else {
-        print('Current song not found in the new queue, keeping index at $_currentIndex');
       }
     }
   }
@@ -413,18 +393,15 @@ class AudioPlayerService {
     
     // Basic validation
     if (_playbackQueue.isEmpty || _currentIndex < 0) {
-      print('Skip prevented: empty queue or invalid index');
       return;
     }
     
     // Simple direct approach - ignore skip if one is in progress
     if (_isSkipping) {
-      print('Skip already in progress, ignoring duplicate request');
       return;
     }
     
     _isSkipping = true;
-    print('Starting next song operation: _isSkipping = true');
     
     try {
       // Save the next song index and prepare to play
@@ -432,7 +409,6 @@ class AudioPlayerService {
       Song nextSong = _playbackQueue[nextIndex];
       _currentIndex = nextIndex;
       
-      print('Will play next song: ${nextSong.title} (index: $_currentIndex)');
       
       // Use a more direct approach that doesn't call playSong() to avoid recursion
       
@@ -465,19 +441,16 @@ class AudioPlayerService {
       // Start playback
       audioPlayer.play();
       
-      print('Started playback of next song: ${nextSong.title}');
       
       // Preload the next song
       _preloadNextSong();
     } catch (e) {
-      print('Error playing next song: $e');
       
       // Reset the skipping flag so we can try the next song
       _isSkipping = false;
       
       // Wait a moment before trying the next song to avoid rapid skips
       Future.delayed(Duration(milliseconds: 500), () {
-        print('Auto-skipping after error with: ${_currentSong?.title}');
         playNextSong(); // Skip to the next song on error
       });
       
@@ -487,7 +460,6 @@ class AudioPlayerService {
       if (_isSkipping) {
         Timer(Duration(milliseconds: 300), () {
           _isSkipping = false;
-          print('Next song operation complete: _isSkipping = false');
         });
       }
     }
@@ -503,18 +475,15 @@ class AudioPlayerService {
     
     // Basic validation
     if (_playbackQueue.isEmpty || _currentIndex < 0) {
-      print('Skip prevented: empty queue or invalid index');
       return;
     }
     
     // Simple direct approach - ignore skip if one is in progress
     if (_isSkipping) {
-      print('Skip already in progress, ignoring duplicate request');
       return;
     }
     
     _isSkipping = true;
-    print('Starting previous song operation: _isSkipping = true');
     
     try {
       // Save the previous song index and prepare to play
@@ -522,7 +491,6 @@ class AudioPlayerService {
       Song prevSong = _playbackQueue[prevIndex];
       _currentIndex = prevIndex;
       
-      print('Will play previous song: ${prevSong.title} (index: $_currentIndex)');
       
       // Use a more direct approach that doesn't call playSong() to avoid recursion
       
@@ -555,19 +523,16 @@ class AudioPlayerService {
       // Start playback
       audioPlayer.play();
       
-      print('Started playback of previous song: ${prevSong.title}');
       
       // Preload the next song
       _preloadNextSong();
     } catch (e) {
-      print('Error playing previous song: $e');
       
       // Reset the skipping flag so we can try the next song
       _isSkipping = false;
       
       // When previous song fails, we should go to the next song (not previous again)
       Future.delayed(Duration(milliseconds: 500), () {
-        print('Auto-skipping to next song after error with: ${_currentSong?.title}');
         playNextSong(); // Skip to the next song on error
       });
       
@@ -577,7 +542,6 @@ class AudioPlayerService {
       if (_isSkipping) {
         Timer(Duration(milliseconds: 300), () {
           _isSkipping = false;
-          print('Previous song operation complete: _isSkipping = false');
         });
       }
     }
@@ -585,7 +549,6 @@ class AudioPlayerService {
   
   Future<void> playSong(Song song) async {
     try {
-      print('Attempting to play song: ${song.title}');
       
       _currentSong = song;
       _currentSongController.add(song);
@@ -596,9 +559,7 @@ class AudioPlayerService {
       int songIndex = _playbackQueue.indexWhere((s) => s.id == song.id);
       if (songIndex != -1) {
         _currentIndex = songIndex;
-        print('Song index updated to $_currentIndex in active queue');
       } else {
-        print('Song not found in the active queue');
       }
       
       final streamUrl = '$streamBaseUrl/${song.id}';
@@ -622,19 +583,16 @@ class AudioPlayerService {
         await audioPlayer.setSkipSilenceEnabled(false);
         
         if (isEmulator) {
-          print('Applying emulator audio optimizations');
         }
       }
       
       await audioPlayer.play();
       
-      print('Now streaming: ${song.title} from $streamUrl');
       
       // Pre-cache the next song for smoother playback
       _preloadNextSong();
       
     } catch (e) {
-      print('Error playing song: $e');
       _handlePlaybackError(e);
     }
   }
@@ -660,9 +618,7 @@ class AudioPlayerService {
       // Start playback again
       await audioPlayer.play();
       
-      print('Looping song: ${_currentSong!.title}');
     } catch (e) {
-      print('Error looping song: $e');
       _handlePlaybackError(e);
     }
   }

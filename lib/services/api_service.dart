@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/song.dart';
 import '../models/playlist.dart';
@@ -8,38 +7,23 @@ import '../models/sync_job.dart';
 class ApiService {
   // Base URLs for the API endpoints
   static const String _baseUrl = 'https://wrapifyapi.dedyn.io';
-  static const String _altBaseUrl = 'https://wrapifyapi.duckdns.org';
-  
-  static const String _syncPlaylistUrl = '$_altBaseUrl/syncplaylist';
+  static const String _syncPlaylistUrl = '$_baseUrl/syncplaylist';
   static const String _playlistDetailsUrl = '$_baseUrl/playlist';
   static const String _streamBaseUrl = '$_baseUrl/stream';
   static const String _syncStatusUrl = '$_baseUrl/syncstatus';
   static const String _playlistErrorsUrl = '$_baseUrl/playlist-errors';
   static const String _resyncSongUrl = '$_baseUrl/resyncsong';
   
-  // Create an HTTP client that accepts all certificates
-  http.Client _createClient() {
-    HttpClient httpClient = HttpClient()
-      ..badCertificateCallback = 
-          ((X509Certificate cert, String host, int port) => true);
-          
-    return http.Client();
-  }
+  // Use the standard http client for default validation
+  final http.Client _client = http.Client();
 
   // Fetch a playlist's songs from the API
   Future<List<Song>> fetchPlaylistSongs(String playlistId) async {
     try {
-      // Create a client that bypasses certificate validation
-      final client = HttpClient()
-        ..badCertificateCallback = 
-            ((X509Certificate cert, String host, int port) => true);
-            
-      final request = await client.getUrl(Uri.parse('$_playlistDetailsUrl/$playlistId'));
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
+      final response = await _client.get(Uri.parse('$_playlistDetailsUrl/$playlistId'));
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
+        final data = jsonDecode(response.body);
         final items = data['items'] as List;
         
         return items.map((item) => Song.fromJson(item)).toList();
@@ -47,7 +31,7 @@ class ApiService {
         throw Exception('Failed to fetch playlist: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching playlist songs: $e');
+      // Keep print for now as requested
       throw Exception('Failed to fetch songs: $e');
     }
   }
@@ -55,20 +39,14 @@ class ApiService {
   // Sync a playlist from Spotify to the server - now returns SyncJob details
   Future<SyncJob> syncPlaylist(String spotifyUrl) async {
     try {
-      // Create a client that bypasses certificate validation
-      final client = HttpClient()
-        ..badCertificateCallback = 
-            ((X509Certificate cert, String host, int port) => true);
-            
-      final request = await client.postUrl(Uri.parse(_syncPlaylistUrl));
-      request.headers.set('Content-Type', 'application/json');
-      request.add(utf8.encode(jsonEncode({'url': spotifyUrl})));
-      
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
+      final response = await _client.post(
+        Uri.parse(_syncPlaylistUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'url': spotifyUrl}),
+      );
       
       if (response.statusCode == 202) {
-        final data = jsonDecode(responseBody);
+        final data = jsonDecode(response.body);
         return SyncJob(
           id: data['jobId'],
           playlistId: data['playlistId'] ?? '',
@@ -81,7 +59,7 @@ class ApiService {
         throw Exception('Failed to sync playlist: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error syncing playlist: $e');
+      // Keep print for now
       throw Exception('Failed to sync playlist: $e');
     }
   }
@@ -89,22 +67,16 @@ class ApiService {
   // Get the status of a syncing job
   Future<SyncJob> getSyncStatus(String jobId) async {
     try {
-      final client = HttpClient()
-        ..badCertificateCallback = 
-            ((X509Certificate cert, String host, int port) => true);
-            
-      final request = await client.getUrl(Uri.parse('$_syncStatusUrl/$jobId'));
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
+      final response = await _client.get(Uri.parse('$_syncStatusUrl/$jobId'));
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
+        final data = jsonDecode(response.body);
         return SyncJob.fromJson(data);
       } else {
         throw Exception('Failed to get sync status: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error getting sync status: $e');
+      // Keep print for now
       throw Exception('Failed to get sync status: $e');
     }
   }
@@ -112,21 +84,15 @@ class ApiService {
   // Get error information for songs in a playlist
   Future<Map<String, dynamic>> getPlaylistErrors(String playlistId) async {
     try {
-      final client = HttpClient()
-        ..badCertificateCallback = 
-            ((X509Certificate cert, String host, int port) => true);
-            
-      final request = await client.getUrl(Uri.parse('$_playlistErrorsUrl/$playlistId'));
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
+      final response = await _client.get(Uri.parse('$_playlistErrorsUrl/$playlistId'));
       
       if (response.statusCode == 200) {
-        return jsonDecode(responseBody);
+        return jsonDecode(response.body);
       } else {
         throw Exception('Failed to get playlist errors: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error getting playlist errors: $e');
+      // Keep print for now
       return {
         'playlistId': playlistId,
         'errorCount': 0,
@@ -138,22 +104,16 @@ class ApiService {
   // Resync a specific song that might have issues
   Future<Map<String, dynamic>> resyncSong(String songId) async {
     try {
-      final client = HttpClient()
-        ..badCertificateCallback = 
-            ((X509Certificate cert, String host, int port) => true);
-            
-      final request = await client.postUrl(Uri.parse('$_resyncSongUrl/$songId'));
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
+      final response = await _client.post(Uri.parse('$_resyncSongUrl/$songId'));
       
       if (response.statusCode == 200) {
-        return jsonDecode(responseBody);
+        return jsonDecode(response.body);
       } else {
-        final errorData = jsonDecode(responseBody);
+        final errorData = jsonDecode(response.body);
         throw Exception(errorData['message'] ?? 'Failed to resync song');
       }
     } catch (e) {
-      print('Error resyncing song: $e');
+      // Keep print for now
       throw Exception('Failed to resync song: $e');
     }
   }

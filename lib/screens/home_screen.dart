@@ -41,7 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading playlists: $e');
       setState(() {
         _isLoading = false;
       });
@@ -109,7 +108,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } catch (e) {
-      print('Error adding playlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error adding playlist: $e'),
@@ -131,7 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final syncJob = await _apiService.getSyncStatus(jobId);
         await _storageService.saveSyncJob(syncJob);
         
-        print('Sync status: ${syncJob.status}, Progress: ${syncJob.progress}');
         
         // If the job is complete or has an error, stop polling
         if (syncJob.isComplete || syncJob.isError) {
@@ -158,7 +155,6 @@ class _HomeScreenState extends State<HomeScreen> {
         
         attempts++;
       } catch (e) {
-        print('Error polling sync status: $e');
         attempts++;
         
         // If too many errors, just stop polling
@@ -198,7 +194,6 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } catch (e) {
-      print('Error checking for song errors: $e');
     }
   }
 
