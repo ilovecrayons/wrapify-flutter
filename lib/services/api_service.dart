@@ -3,8 +3,12 @@ import 'package:http/http.dart' as http;
 import '../models/song.dart';
 import '../models/playlist.dart';
 import '../models/sync_job.dart';
+import '../utils/logger.dart';
 
 class ApiService {
+  // Logger instance for this service
+  final Logger _logger = Logger('ApiService');
+  
   // Base URLs for the API endpoints
   static const String _baseUrl = 'https://wrapifyapi.dedyn.io';
   static const String _syncPlaylistUrl = '$_baseUrl/syncplaylist';
@@ -31,7 +35,7 @@ class ApiService {
         throw Exception('Failed to fetch playlist: ${response.statusCode}');
       }
     } catch (e) {
-      // Keep print for now as requested
+      _logger.error('Failed to fetch songs', e);
       throw Exception('Failed to fetch songs: $e');
     }
   }
@@ -59,7 +63,7 @@ class ApiService {
         throw Exception('Failed to sync playlist: ${response.statusCode}');
       }
     } catch (e) {
-      // Keep print for now
+      _logger.error('Failed to sync playlist', e);
       throw Exception('Failed to sync playlist: $e');
     }
   }
@@ -76,7 +80,7 @@ class ApiService {
         throw Exception('Failed to get sync status: ${response.statusCode}');
       }
     } catch (e) {
-      // Keep print for now
+      _logger.error('Failed to get sync status', e);
       throw Exception('Failed to get sync status: $e');
     }
   }
@@ -92,7 +96,7 @@ class ApiService {
         throw Exception('Failed to get playlist errors: ${response.statusCode}');
       }
     } catch (e) {
-      // Keep print for now
+      _logger.error('Failed to get playlist errors', e);
       return {
         'playlistId': playlistId,
         'errorCount': 0,
@@ -113,7 +117,7 @@ class ApiService {
         throw Exception(errorData['message'] ?? 'Failed to resync song');
       }
     } catch (e) {
-      // Keep print for now
+      _logger.error('Failed to resync song', e);
       throw Exception('Failed to resync song: $e');
     }
   }
