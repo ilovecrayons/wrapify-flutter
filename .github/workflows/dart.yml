@@ -38,5 +38,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/ios/iphoneos/FlutterIpaExport.ipa
           tag: v1.1
+          tag: v1.1
           overwrite: true
           body: "Playback controls tweaks"
