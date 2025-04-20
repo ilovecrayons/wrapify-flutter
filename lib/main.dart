@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart' as audio_service;
+import 'dart:io'; // Add import for Platform check
 import 'screens/home_screen.dart';
 import 'screens/playlist_screen.dart';
 import 'widgets/global_playback_bar.dart';
@@ -15,6 +16,45 @@ class WrapifyAudioHandler extends audio_service.BaseAudioHandler with audio_serv
   final AudioPlayerService _playerService;
   
   WrapifyAudioHandler(this._playerService) {
+    // Set up iOS-specific handling
+    if (Platform.isIOS) {
+      _logger.debug('Configuring iOS-specific audio handler');
+      
+      // Immediately set initial state to make iOS recognize media capabilities
+      playbackState.add(audio_service.PlaybackState(
+        controls: [
+          audio_service.MediaControl.skipToPrevious,
+          audio_service.MediaControl.play,
+          audio_service.MediaControl.skipToNext,
+        ],
+        systemActions: const {
+          audio_service.MediaAction.seek,
+          audio_service.MediaAction.skipToPrevious, 
+          audio_service.MediaAction.skipToNext,
+          audio_service.MediaAction.play,
+          audio_service.MediaAction.pause,
+        },
+        androidCompactActionIndices: const [0, 1, 2],
+        processingState: audio_service.AudioProcessingState.ready,
+        playing: false,
+        updatePosition: Duration.zero, // Changed from position to updatePosition
+        bufferedPosition: Duration.zero,
+        speed: 1.0,
+      ));
+      
+      // Set a placeholder media item to encourage iOS to show controls
+      mediaItem.add(audio_service.MediaItem(
+        id: 'placeholder',
+        title: 'Wrapify Music',
+        artist: 'Ready to play',
+        album: 'Wrapify',
+        duration: const Duration(milliseconds: 1),
+        playable: true,
+        displayTitle: 'Wrapify Music',
+        displaySubtitle: 'Ready to play your music',
+      ));
+    }
+    
     // Listen to playback events from our custom player service
     _playerService.currentSongStream.listen((song) {
       if (song != null) {
@@ -94,35 +134,43 @@ class WrapifyAudioHandler extends audio_service.BaseAudioHandler with audio_serv
     });
   }
   
-  // Implement play control
+  // Override these methods to ensure iOS recognizes them
   @override
   Future<void> play() async {
     _logger.debug("AudioHandler: play() called");
     await _playerService.resumePlayback();
+    super.play(); // Make sure to call super methods for iOS
   }
   
-  // Implement pause control
   @override
   Future<void> pause() async {
     _logger.debug("AudioHandler: pause() called");
     await _playerService.pausePlayback();
+    super.pause(); // Make sure to call super methods for iOS
   }
   
-  // Implement skip to next control
   @override
   Future<void> skipToNext() async {
     _logger.debug("AudioHandler: skipToNext() called");
     await _playerService.playNextSong();
+    super.skipToNext(); // Make sure to call super methods for iOS
   }
   
-  // Implement skip to previous control
   @override
   Future<void> skipToPrevious() async {
     _logger.debug("AudioHandler: skipToPrevious() called");
     await _playerService.playPreviousSong();
+    super.skipToPrevious(); // Make sure to call super methods for iOS
   }
   
-  // Implement stop control
+  // Implement seek for iOS
+  @override
+  Future<void> seek(Duration position) async {
+    _logger.debug("AudioHandler: seek() called to $position");
+    await _playerService.seekTo(position);
+    super.seek(position); // Make sure to call super methods for iOS
+  }
+  
   @override
   Future<void> stop() async {
     _logger.debug("AudioHandler: stop() called");
@@ -146,13 +194,15 @@ void main() async {
       androidNotificationChannelName: 'Wrapify Audio Playback',
       // Keep foreground service active even when paused for better background reliability
       androidStopForegroundOnPause: false,
-      // Add iOS notification settings
+      // Make sure we show iOS controls immediately 
       notificationColor: Color.fromRGBO(30, 215, 96, 1),
       artDownscaleWidth: 300,
       artDownscaleHeight: 300,
-      // Enable fast forwarding through notification on iOS
       fastForwardInterval: Duration(seconds: 30),
       rewindInterval: Duration(seconds: 30),
+      // Add these properties to improve iOS control appearance
+      preloadArtwork: true,
+      androidShowNotificationBadge: true,
     ),
   );
 

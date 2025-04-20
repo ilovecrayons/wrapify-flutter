@@ -130,153 +130,154 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
     // Determine if skip buttons should be disabled (when in loop mode)
     final bool isLoopMode = _playbackMode == PlaybackMode.loop;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Skip controls above the playback bar
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          color: Colors.grey[100],
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Previous button - disabled in loop mode
-              IconButton(
-                icon: Icon(
-                  Icons.skip_previous,
-                  color: isLoopMode ? Colors.grey[400] : null,
-                ),
-                iconSize: 24,
-                onPressed: isLoopMode ? null : _audioPlayerService.playPreviousSong,
-                tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Previous song',
-              ),
-              
-              // Spacer to separate buttons
-              const SizedBox(width: 40),
-              
-              // Next button - disabled in loop mode
-              IconButton(
-                icon: Icon(
-                  Icons.skip_next,
-                  color: isLoopMode ? Colors.grey[400] : null,
-                ),
-                iconSize: 24,
-                onPressed: isLoopMode ? null : _audioPlayerService.playNextSong,
-                tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Next song',
-              ),
-            ],
-          ),
-        ),
-        
-        // Now playing bar with progress
-        GestureDetector(
-          onTap: _audioPlayerService.togglePlayback,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            color: Colors.grey[200],
-            child: Column(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0), // Add bottom padding to move up from screen edge
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Skip controls above the playback bar
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8.0), // Increased vertical padding
+            color: Colors.grey[100],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  children: [
-                    // Song image or placeholder
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[400],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: _currentSong!.imageUrl != null
-                          ? Image.network(_currentSong!.imageUrl!, fit: BoxFit.cover)
-                          : const Icon(Icons.music_note, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    // Song info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _currentSong!.title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            maxLines: 1,
-                          ),
-                          Text(
-                            _currentSong!.artist,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            maxLines: 1,
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Play/pause button
-                    IconButton(
-                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-                      iconSize: 32,
-                      onPressed: _audioPlayerService.togglePlayback,
-                    ),
-                    // Playback mode toggle with updated icons
-                    IconButton(
-                      icon: _getPlaybackModeIcon(),
-                      onPressed: _audioPlayerService.togglePlaybackMode,
-                      tooltip: _getPlaybackModeTooltip(),
-                    ),
-                  ],
+                // Previous button - disabled in loop mode
+                IconButton(
+                  icon: Icon(
+                    Icons.skip_previous,
+                    color: isLoopMode ? Colors.grey[400] : null,
+                  ),
+                  iconSize: 28, // Slightly larger icons
+                  onPressed: isLoopMode ? null : _audioPlayerService.playPreviousSong,
+                  tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Previous song',
                 ),
-                const SizedBox(height: 8),
-                // Progress indicator row
-                Row(
-                  children: [
-                    Text(
-                      _formatDuration(_currentPosition),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          // Playback progress
-                          LinearProgressIndicator(
-                            value: progressValue,
-                            backgroundColor: Colors.grey[300],
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Theme.of(context).colorScheme.primary,
-                            ),
-                            minHeight: 3,
-                          ),
-                          const SizedBox(height: 2),
-                          // Buffer indicator
-                          LinearProgressIndicator(
-                            value: _bufferingProgress,
-                            backgroundColor: Colors.transparent,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.grey[400]!,
-                            ),
-                            minHeight: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _formatDuration(_totalDuration),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                    ),
-                  ],
+                
+                // Play/pause button moved here between prev and next
+                IconButton(
+                  icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+                  iconSize: 42, // Larger size for the play/pause button
+                  onPressed: _audioPlayerService.togglePlayback,
+                  tooltip: _isPlaying ? 'Pause' : 'Play',
+                ),
+                
+                // Next button - disabled in loop mode
+                IconButton(
+                  icon: Icon(
+                    Icons.skip_next,
+                    color: isLoopMode ? Colors.grey[400] : null,
+                  ),
+                  iconSize: 28, // Slightly larger icons
+                  onPressed: isLoopMode ? null : _audioPlayerService.playNextSong,
+                  tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Next song',
                 ),
               ],
             ),
           ),
-        ),
-        // Removed the bottom control bar with duplicate buttons
-      ],
+          
+          // Now playing bar with progress - play/pause button removed from here
+          GestureDetector(
+            onTap: _audioPlayerService.togglePlayback,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              color: Colors.grey[200],
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      // Song image or placeholder
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[400],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: _currentSong!.imageUrl != null
+                            ? Image.network(_currentSong!.imageUrl!, fit: BoxFit.cover)
+                            : const Icon(Icons.music_note, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      // Song info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _currentSong!.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              maxLines: 1,
+                            ),
+                            Text(
+                              _currentSong!.artist,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              maxLines: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Playback mode toggle icon - moved to right side
+                      IconButton(
+                        icon: _getPlaybackModeIcon(),
+                        onPressed: _audioPlayerService.togglePlaybackMode,
+                        tooltip: _getPlaybackModeTooltip(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Progress indicator row
+                  Row(
+                    children: [
+                      Text(
+                        _formatDuration(_currentPosition),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            // Playback progress
+                            LinearProgressIndicator(
+                              value: progressValue,
+                              backgroundColor: Colors.grey[300],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Theme.of(context).colorScheme.primary,
+                              ),
+                              minHeight: 3,
+                            ),
+                            const SizedBox(height: 2),
+                            // Buffer indicator
+                            LinearProgressIndicator(
+                              value: _bufferingProgress,
+                              backgroundColor: Colors.transparent,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.grey[400]!,
+                              ),
+                              minHeight: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatDuration(_totalDuration),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
