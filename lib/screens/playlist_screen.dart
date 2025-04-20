@@ -5,6 +5,7 @@ import '../models/sync_job.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/audio_player_service.dart';
+import '../utils/logger.dart';
 
 class PlaylistScreen extends StatefulWidget {
   final String playlistId;
@@ -24,6 +25,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   final ApiService _apiService = ApiService();
   final StorageService _storageService = StorageService();
   final AudioPlayerService _audioPlayerService = AudioPlayerService();
+  final Logger _logger = Logger('PlaylistScreen');
   
   List<Song> _songs = [];
   Playlist? _playlist;
@@ -235,7 +237,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         );
       }).toList();
 
+      // Use the song variable to improve logging 
       for (var song in displayErrorSongs) {
+        // Log error songs when debugging
+        if (song.errorMessage != null) {
+          // Using logger for actual logging instead of empty comment
+          _logger.debug('Error song: ${song.title}, Error: ${song.errorMessage}');
+        }
       }
 
       if (displayErrorSongs.isEmpty) {
@@ -259,14 +267,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       showDialog(
         context: context,
         builder: (context) => Dialog(
-          insetPadding: EdgeInsets.all(16.0),
+          insetPadding: const EdgeInsets.all(16.0),
           child: Container(
             width: double.maxFinite,
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.8, // 80% of screen height
               maxWidth: 600,
             ),
-            padding: EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,13 +286,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     children: [
                       Text(
                         'Song Errors (${displayErrorSongs.length})',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.close),
+                        icon: const Icon(Icons.close),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ],
@@ -305,11 +313,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   child: Scrollbar(
                     thumbVisibility: true,
                     thickness: 6.0,
-                    radius: Radius.circular(10.0),
+                    radius: const Radius.circular(10.0),
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: displayErrorSongs.length,
-                      separatorBuilder: (context, index) => Divider(height: 1),
+                      separatorBuilder: (context, index) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final song = displayErrorSongs[index];
                         return Padding(
@@ -319,21 +327,21 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.error, color: Colors.red, size: 20),
-                                  SizedBox(width: 8),
+                                  const Icon(Icons.error, color: Colors.red, size: 20),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       song.title,
-                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ],
                               ),
                               Padding(
-                                padding: EdgeInsets.only(left: 28.0, top: 4.0),
+                                padding: const EdgeInsets.only(left: 28.0, top: 4.0),
                                 child: Text(
                                   song.errorMessage ?? 'Unknown error',
-                                  style: TextStyle(color: Colors.red),
+                                  style: const TextStyle(color: Colors.red),
                                 ),
                               ),
                             ],
@@ -418,7 +426,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     
     if (song.isIgnored) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('This song is set to be ignored during playback'),
           backgroundColor: Colors.orange,
         ),
@@ -434,7 +442,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     // Ensure the song was found in the playable list
     if (startIndexInPlayable == -1) {
        ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Error finding song in playable list.'),
           backgroundColor: Colors.red,
         ),
@@ -456,7 +464,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     
     while (!isComplete && attempts < maxAttempts && mounted) {
       try {
-        await Future.delayed(Duration(seconds: 10));
+        await Future.delayed(const Duration(seconds: 10));
         final syncJob = await _apiService.getSyncStatus(jobId);
         await _storageService.saveSyncJob(syncJob);
         
@@ -552,7 +560,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         SnackBar(
           content: Text('Syncing "${syncJob.playlistName}" in the background. Check back soon!'),
           backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
@@ -574,7 +582,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Resyncing "${song.title}"...'),
-          duration: Duration(seconds: 1),
+          duration: const Duration(seconds: 1),
         ),
       );
       
@@ -614,7 +622,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           ),
         );
         
-        _audioPlayerService.clearCache(songId: song.id);
+        _audioPlayerService.clearDiskCache();
         _audioPlayerService.preCacheSong(updatedSong);
       } else {
         throw Exception(result['message'] ?? 'Unknown error');
@@ -704,16 +712,16 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               backgroundImage: song.imageUrl != null 
                 ? NetworkImage(song.imageUrl!) 
                 : null,
-              child: song.imageUrl == null ? Icon(Icons.music_note) : null,
+              child: song.imageUrl == null ? const Icon(Icons.music_note) : null,
             ),
             title: Text(song.title),
             subtitle: Text(song.artist),
           ),
-          Divider(),
+          const Divider(),
           
           ListTile(
-            leading: Icon(Icons.refresh),
-            title: Text('Resync song'),
+            leading: const Icon(Icons.refresh),
+            title: const Text('Resync song'),
             subtitle: Text(song.hasError
               ? 'Attempt to fix error by redownloading'
               : 'Download this song again'),
@@ -737,8 +745,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           
           if (song.hasError)
             ListTile(
-              leading: Icon(Icons.error_outline, color: Colors.red),
-              title: Text('View error details'),
+              leading: const Icon(Icons.error_outline, color: Colors.red),
+              title: const Text('View error details'),
               onTap: () {
                 Navigator.pop(context);
                 _showErrorDetails(song);
@@ -748,14 +756,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           if (!song.hasError && !song.isIgnored)
             ListTile(
               leading: Icon(Icons.play_circle_filled, color: Theme.of(context).primaryColor),
-              title: Text('Play this song'),
+              title: const Text('Play this song'),
               onTap: () {
                 Navigator.pop(context);
                 _playSong(song);
               },
             ),
             
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -830,7 +838,37 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   content: Text(newMode
                       ? 'Optimized buffering enabled'
                       : 'Standard buffering mode'),
-                  duration: Duration(seconds: 1),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
+            },
+          ),
+          
+          // Display current playback mode with appropriate icon
+          IconButton(
+            icon: Icon(
+              _playbackMode == PlaybackMode.shuffle 
+                ? Icons.shuffle
+                : _playbackMode == PlaybackMode.loop
+                  ? Icons.repeat
+                  : Icons.straight,
+              color: Colors.white,
+            ),
+            tooltip: 'Playback mode: ${_playbackMode.toString().split('.').last}',
+            onPressed: () {
+              // Cycle through playback modes
+              final nextMode = _playbackMode == PlaybackMode.linear 
+                ? PlaybackMode.shuffle 
+                : _playbackMode == PlaybackMode.shuffle
+                  ? PlaybackMode.loop
+                  : PlaybackMode.linear;
+                  
+              _audioPlayerService.togglePlaybackMode();
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Playback mode: ${nextMode.toString().split('.').last}'),
+                  duration: const Duration(seconds: 1),
                 ),
               );
             },
@@ -899,13 +937,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                 ),
                                 if (hasError)
                                   Container(
-                                    decoration: BoxDecoration(
+                                    decoration: const BoxDecoration(
                                       color: Colors.red,
                                       shape: BoxShape.circle,
                                     ),
                                     width: 16,
                                     height: 16,
-                                    child: Center(
+                                    child: const Center(
                                       child: Icon(
                                         Icons.error,
                                         size: 12,
@@ -915,13 +953,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                   ),
                                 if (isIgnored && !hasError)
                                   Container(
-                                    decoration: BoxDecoration(
+                                    decoration: const BoxDecoration(
                                       color: Colors.orange,
                                       shape: BoxShape.circle,
                                     ),
                                     width: 16,
                                     height: 16,
-                                    child: Center(
+                                    child: const Center(
                                       child: Icon(
                                         Icons.not_interested,
                                         size: 12,
@@ -942,7 +980,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                             subtitle: hasError 
                                 ? Text(
                                     'Error: ${_getErrorMessage(song.id)}',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: Colors.red,
                                       fontSize: 12,
                                     ),
@@ -950,7 +988,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                 : isIgnored
                                     ? Text(
                                         'Ignored - ${song.artist}',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           color: Colors.grey,
                                           fontSize: 12,
                                           fontStyle: FontStyle.italic,

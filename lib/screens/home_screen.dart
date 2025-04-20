@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SnackBar(
           content: Text('Added "${syncJob.playlistName}". Songs are syncing in the background.'),
           backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
@@ -125,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
     
     while (!isComplete && attempts < maxAttempts) {
       try {
-        await Future.delayed(Duration(seconds: 10));
+        await Future.delayed(const Duration(seconds: 10));
         final syncJob = await _apiService.getSyncStatus(jobId);
         await _storageService.saveSyncJob(syncJob);
         

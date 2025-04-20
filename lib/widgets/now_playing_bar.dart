@@ -56,7 +56,7 @@ class NowPlayingBar extends StatelessWidget {
                 ),
                 Text(
                   'Buffered: ${(bufferingProgress * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(fontSize: 10),
+                  style: const TextStyle(fontSize: 10),
                 ),
               ],
             ),

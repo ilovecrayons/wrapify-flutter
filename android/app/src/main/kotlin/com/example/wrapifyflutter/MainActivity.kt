@@ -3,8 +3,10 @@ package com.example.wrapifyflutter
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity: FlutterActivity() {
+// Changed from FlutterActivity to AudioServiceActivity for background audio support
+class MainActivity: AudioServiceActivity() {
     private val CHANNEL = "com.example.wrapifyflutter/audio"
     private lateinit var audioHelper: AudioHelper
     

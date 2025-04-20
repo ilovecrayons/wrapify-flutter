@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/song.dart';
-import '../models/playlist.dart';
 import '../models/sync_job.dart';
 import '../utils/logger.dart';
 

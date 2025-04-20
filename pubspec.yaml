@@ -13,9 +13,14 @@ dependencies:
   cupertino_icons: ^1.0.2
   just_audio: ^0.9.35
   audio_service: ^0.18.10
+  audio_session: ^0.1.15
   path_provider: ^2.1.1
   http: ^1.1.0
   shared_preferences: ^2.2.2
+  sqflite: ^2.3.0  # For database caching
+  connectivity_plus: ^5.0.1  # For checking network connectivity
+  flutter_cache_manager: ^3.3.1  # For file caching
+  dio: ^5.3.3  # For more robust HTTP downloads with retry
   # If you want background audio, uncomment this:
   # just_audio_background: ^0.0.1-beta.10
 

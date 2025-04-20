@@ -92,12 +92,12 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
           color: Colors.grey[600],
         );
       case PlaybackMode.shuffle:
-        return Icon(
+        return const Icon(
           Icons.shuffle,
           color: Colors.green,
         );
       case PlaybackMode.loop:
-        return Icon(
+        return const Icon(
           Icons.repeat_one,
           color: Colors.blue,
         );
