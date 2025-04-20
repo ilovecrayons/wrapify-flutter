@@ -586,6 +586,10 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         ),
       );
       
+      // Remove the old version from cache first
+      await _audioPlayerService.clearDiskCache();
+      await _storageService.getAudioCacheManager().removeSongFromCache(song.id);
+      
       final result = await _apiService.resyncSong(song.id);
       
       if (result['success'] == true) {

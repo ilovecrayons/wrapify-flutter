@@ -24,10 +24,34 @@ class WrapifyAudioHandler extends audio_service.BaseAudioHandler with audio_serv
           title: song.title,
           artist: song.artist,
           artUri: song.imageUrl != null ? Uri.parse(song.imageUrl!) : null,
+          playable: true, // Add this property for iOS
+          duration: _playerService.audioPlayer.duration, // Add duration for iOS progress
+          // Add album for iOS display
+          album: 'Wrapify Playlist',
         ));
       }
     });
     
+    // Set up initial player state for iOS
+    playbackState.add(audio_service.PlaybackState(
+      controls: [
+        audio_service.MediaControl.skipToPrevious,
+        audio_service.MediaControl.play,
+        audio_service.MediaControl.skipToNext,
+      ],
+      systemActions: const {
+        audio_service.MediaAction.seek,
+        audio_service.MediaAction.skipToPrevious,
+        audio_service.MediaAction.skipToNext,
+        audio_service.MediaAction.play,
+        audio_service.MediaAction.pause,
+      },
+      processingState: audio_service.AudioProcessingState.ready,
+      playing: false,
+      updatePosition: Duration.zero,
+      bufferedPosition: Duration.zero,
+    ));
+
     _playerService.playbackStateStream.listen((state) {
       // Update playback state for notification/lockscreen
       playbackState.add(audio_service.PlaybackState(
@@ -51,6 +75,22 @@ class WrapifyAudioHandler extends audio_service.BaseAudioHandler with audio_serv
         // Set a reasonable buffer position to mimic streaming
         bufferedPosition: state.position + const Duration(seconds: 10),
       ));
+    });
+    
+    // Listen to duration changes for iOS progress display
+    _playerService.audioPlayer.durationStream.listen((duration) {
+      if (duration != null && _playerService.currentSong != null) {
+        mediaItem.add(audio_service.MediaItem(
+          id: _playerService.currentSong!.id,
+          title: _playerService.currentSong!.title,
+          artist: _playerService.currentSong!.artist,
+          artUri: _playerService.currentSong!.imageUrl != null ? 
+              Uri.parse(_playerService.currentSong!.imageUrl!) : null,
+          duration: duration,
+          album: 'Wrapify Playlist',
+          playable: true,
+        ));
+      }
     });
   }
   
@@ -106,6 +146,13 @@ void main() async {
       androidNotificationChannelName: 'Wrapify Audio Playback',
       // Keep foreground service active even when paused for better background reliability
       androidStopForegroundOnPause: false,
+      // Add iOS notification settings
+      notificationColor: Color.fromRGBO(30, 215, 96, 1),
+      artDownscaleWidth: 300,
+      artDownscaleHeight: 300,
+      // Enable fast forwarding through notification on iOS
+      fastForwardInterval: Duration(seconds: 30),
+      rewindInterval: Duration(seconds: 30),
     ),
   );
 

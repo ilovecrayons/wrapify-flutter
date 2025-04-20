@@ -378,4 +378,36 @@ class AudioCacheManager {
       return 0;
     }
   }
+
+  /// Remove song from cache when resyncing
+  /// This ensures we get the latest version after resync
+  Future<void> removeSongFromCache(String songId) async {
+    try {
+      final url = '$streamBaseUrl/$songId';
+      
+      _logger.debug('Removing song $songId from cache due to resync');
+      
+      // Remove from in-memory tracking
+      _cachedSongIds.remove(songId);
+      
+      // Remove from cache manager
+      await _cacheManager.removeFile(url);
+      
+      // Double check by trying to get the file
+      final fileInfo = await _cacheManager.getFileFromCache(url);
+      if (fileInfo != null) {
+        // If still exists, try direct file deletion
+        _logger.debug('Directly removing cached file for $songId');
+        try {
+          await fileInfo.file.delete();
+        } catch (e) {
+          _logger.error('Error deleting cached file for $songId', e);
+        }
+      }
+      
+      _logger.debug('Successfully removed song $songId from cache');
+    } catch (e) {
+      _logger.error('Error removing song $songId from cache', e);
+    }
+  }
 }

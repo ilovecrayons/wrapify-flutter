@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/playlist.dart';
 import '../models/song.dart';
 import '../models/sync_job.dart';
+import 'audio_cache_manager.dart'; // Add this import
 
 class StorageService {
   static const String _playlistsKey = 'wrapify_playlists';
@@ -10,6 +11,9 @@ class StorageService {
   static const String _syncJobsKey = 'wrapify_sync_jobs';
   static const String _songErrorsKey = 'wrapify_song_errors';
   static const String _ignoredSongsKey = 'wrapify_ignored_songs'; // New key for ignored songs
+  
+  // Create an instance of AudioCacheManager
+  final AudioCacheManager _audioCacheManager = AudioCacheManager();
 
   // Save playlists to persistent storage
   Future<void> savePlaylists(List<Playlist> playlists) async {
@@ -617,5 +621,10 @@ class StorageService {
     final existingPlaylists = await loadPlaylists();
     existingPlaylists.removeWhere((playlist) => playlist.id == playlistId);
     await savePlaylists(existingPlaylists);
+  }
+
+  // Return the AudioCacheManager instance
+  AudioCacheManager getAudioCacheManager() {
+    return _audioCacheManager;
   }
 }

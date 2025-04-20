@@ -133,6 +133,41 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Skip controls above the playback bar
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          color: Colors.grey[100],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Previous button - disabled in loop mode
+              IconButton(
+                icon: Icon(
+                  Icons.skip_previous,
+                  color: isLoopMode ? Colors.grey[400] : null,
+                ),
+                iconSize: 24,
+                onPressed: isLoopMode ? null : _audioPlayerService.playPreviousSong,
+                tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Previous song',
+              ),
+              
+              // Spacer to separate buttons
+              const SizedBox(width: 40),
+              
+              // Next button - disabled in loop mode
+              IconButton(
+                icon: Icon(
+                  Icons.skip_next,
+                  color: isLoopMode ? Colors.grey[400] : null,
+                ),
+                iconSize: 24,
+                onPressed: isLoopMode ? null : _audioPlayerService.playNextSong,
+                tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Next song',
+              ),
+            ],
+          ),
+        ),
+        
         // Now playing bar with progress
         GestureDetector(
           onTap: _audioPlayerService.togglePlayback,
@@ -240,45 +275,7 @@ class _GlobalPlaybackBarState extends State<GlobalPlaybackBar> {
             ),
           ),
         ),
-        
-        // Playback controls
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-          color: Colors.grey[100],
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // Previous button - disabled in loop mode
-              IconButton(
-                icon: Icon(
-                  Icons.skip_previous,
-                  color: isLoopMode ? Colors.grey[400] : null,
-                ),
-                iconSize: 28,
-                onPressed: isLoopMode ? null : _audioPlayerService.playPreviousSong,
-                tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Previous song',
-              ),
-              
-              // Play/Pause button
-              IconButton(
-                icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                iconSize: 36,
-                onPressed: _audioPlayerService.togglePlayback,
-              ),
-              
-              // Next button - disabled in loop mode
-              IconButton(
-                icon: Icon(
-                  Icons.skip_next,
-                  color: isLoopMode ? Colors.grey[400] : null,
-                ),
-                iconSize: 28,
-                onPressed: isLoopMode ? null : _audioPlayerService.playNextSong,
-                tooltip: isLoopMode ? 'Skip disabled in loop mode' : 'Next song',
-              ),
-            ],
-          ),
-        ),
+        // Removed the bottom control bar with duplicate buttons
       ],
     );
   }
